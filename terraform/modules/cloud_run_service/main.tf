@@ -53,11 +53,7 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
-resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
-  count    = var.allow_unauthenticated ? 1 : 0
-  project  = var.project_id
-  location = var.location
-  name     = google_cloud_run_v2_service.this.name
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
+# No Terraform-managed public/allUsers invoker binding — org policy
+# (Domain Restricted Sharing) blocks it. Access is via Identity-Aware Proxy,
+# enabled once through the Console (Cloud Run service -> Security tab),
+# which grants the IAP service agent run.invoker automatically.
