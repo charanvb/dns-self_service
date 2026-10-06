@@ -33,3 +33,22 @@ module "db_migrate_job" {
 
   depends_on = [module.secret_manager]
 }
+
+module "ui_service" {
+  source = "../../modules/cloud_run_service"
+
+  project_id             = var.project_id
+  location               = var.region
+  service_name           = "dns-self-service-ui"
+  image                  = "us-docker.pkg.dev/cloudrun/container/hello:latest" # placeholder, replaced by CI
+  service_account_email  = var.runtime_service_account_email
+  allow_unauthenticated  = true
+  vpc_network            = var.vpc_network
+  vpc_subnetwork         = var.vpc_subnetwork
+  secret_env_vars = [
+    { name = "DATABASE_URL", secret_id = "db-connection-string" },
+    { name = "APP_AUTH_SIGNING_KEY", secret_id = "app-auth-signing-key" },
+  ]
+
+  depends_on = [module.secret_manager]
+}

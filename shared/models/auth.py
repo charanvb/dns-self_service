@@ -19,6 +19,7 @@ class User(TimestampMixin, Base):
     username: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     roles: Mapped[list["UserRole"]] = relationship(back_populates="user", cascade="all, delete-orphan")
