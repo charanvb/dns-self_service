@@ -56,7 +56,11 @@ class MicetroClient:
         return resp
 
     def get(self, path: str, **kwargs) -> dict:
-        return self.request("GET", path, **kwargs).json()
+        body = self.request("GET", path, **kwargs).json()
+        # Real API responses are wrapped in {"result": {...}} even where the
+        # swagger schema shows a flat object — confirmed empirically, not just
+        # for /sessions. Unwrap once here so callers always see a flat dict.
+        return body.get("result", body) if isinstance(body, dict) else body
 
     def post(self, path: str, **kwargs) -> requests.Response:
         return self.request("POST", path, **kwargs)
