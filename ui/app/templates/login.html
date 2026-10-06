@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Sign in — DNS Self-Service{% endblock %}
+{% block body %}
+<div class="login-wrapper">
+  <div class="login-card">
+    <div class="brand"><span class="logo-dot" style="background:#0a5ad6;width:10px;height:10px;border-radius:50%;display:inline-block;"></span> DNS Self-Service</div>
+
+    <form id="login-form" novalidate>
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required />
+      <div class="field-error" id="username-error"></div>
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <div class="field-error" id="password-error"></div>
+
+      <button type="submit" id="submit-btn">Sign in</button>
+      <div class="form-error" id="form-error"></div>
+    </form>
+
+    <div class="hint">
+      Local test accounts only (pre-CIH). Example: <code>requestor1</code> / <code>Test@12345</code>.
+    </div>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById("login-form");
+  const usernameInput = document.getElementById("username");
+  const passwordInput = document.getElementById("password");
+  const usernameError = document.getElementById("username-error");
+  const passwordError = document.getElementById("password-error");
+  const formError = document.getElementById("form-error");
+  const submitBtn = document.getElementById("submit-btn");
+
+  function clearErrors() {
+    usernameError.textContent = "";
+    passwordError.textContent = "";
+    formError.style.display = "none";
+    formError.textContent = "";
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearErrors();
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+    let hasError = false;
+    if (!username) {
+      usernameError.textContent = "Username is required";
+      hasError = true;
+    }
+    if (!password) {
+      passwordError.textContent = "Password is required";
+      hasError = true;
+    }
+    if (hasError) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Signing in...";
+    try {
+      const res = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (res.ok) {
+        window.location.href = "/dashboard";
+        return;
+      }
+      if (res.status === 401) {
+        formError.textContent = "Invalid username or password.";
+      } else {
+        formError.textContent = "Something went wrong. Please try again.";
+      }
+      formError.style.display = "block";
+    } catch (err) {
+      formError.textContent = "Could not reach the server. Please try again.";
+      formError.style.display = "block";
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign in";
+    }
+  });
+</script>
+{% endblock %}

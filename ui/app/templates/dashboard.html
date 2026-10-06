@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — DNS Self-Service{% endblock %}
+{% block body %}
+<div class="topbar">
+  <div class="brand"><span class="logo-dot"></span> DNS Self-Service</div>
+  <div class="user-menu">
+    <span>{{ username }}</span>
+    <button id="logout-btn">Logout</button>
+  </div>
+</div>
+
+<div class="page">
+  <h1 class="welcome">Welcome, {{ username }}</h1>
+
+  <div class="card-grid">
+    <div class="card disabled">
+      <div class="card-banner" style="background:#eef4ff;">📝</div>
+      <div class="card-body">
+        <div class="card-title">New DNS Request <span class="badge">Coming soon</span></div>
+        <div class="card-desc">Create a DNS record change request with zone/record search.</div>
+        <a class="card-link" href="#">Go</a>
+      </div>
+    </div>
+
+    <div class="card disabled">
+      <div class="card-banner" style="background:#f3f0ff;">📋</div>
+      <div class="card-body">
+        <div class="card-title">My Requests <span class="badge">Coming soon</span></div>
+        <div class="card-desc">Track the status and history of your DNS requests.</div>
+        <a class="card-link" href="#">Go</a>
+      </div>
+    </div>
+
+    {% if "ZONE_ADMIN" in roles or "CLOUDOPS_ADMIN" in roles %}
+    <div class="card disabled">
+      <div class="card-banner" style="background:#fff7ed;">✅</div>
+      <div class="card-body">
+        <div class="card-title">Pending Approvals <span class="badge">Coming soon</span></div>
+        <div class="card-desc">Review and approve requests for zones you administer.</div>
+        <a class="card-link" href="#">Go</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if "CLOUDOPS_ADMIN" in roles %}
+    <div class="card disabled">
+      <div class="card-banner" style="background:#eefbf3;">⚙️</div>
+      <div class="card-body">
+        <div class="card-title">Manage Zones &amp; Policies <span class="badge">Coming soon</span></div>
+        <div class="card-desc">Assign zone admins and configure approval policies.</div>
+        <a class="card-link" href="#">Go</a>
+      </div>
+    </div>
+
+    <div class="card disabled">
+      <div class="card-banner" style="background:#fdf2f8;">🔍</div>
+      <div class="card-body">
+        <div class="card-title">Audit Logs <span class="badge">Coming soon</span></div>
+        <div class="card-desc">Review who changed what, when, and why.</div>
+        <a class="card-link" href="#">Go</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    await fetch("/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  });
+</script>
+{% endblock %}
