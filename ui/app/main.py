@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -5,6 +7,8 @@ from ui.app.routes.auth import router as auth_router
 from ui.app.routes.pages import router as pages_router
 from ui.app.routes.requests import router as requests_router
 from ui.app.routes.zones import router as zones_router
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 
 app = FastAPI(title="DNS Self-Service Automation Platform")
 

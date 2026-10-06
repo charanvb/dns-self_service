@@ -12,6 +12,10 @@ from shared.validation.registry import SUPPORTED_RECORD_TYPES, validate_record_v
 
 from ui.app.schemas_requests import CreateRequestIn, RequestItemOut, RequestOut
 
+import logging
+
+logger = logging.getLogger("requests_api")
+
 router = APIRouter(prefix="/api/requests", tags=["requests"])
 
 DEFAULT_TTL = 300
@@ -58,13 +62,20 @@ def create_request(
             if item.action == "CREATE":
                 new_value = validate_record_value(item.record_type, item.value)
                 fqdn_clean = item.fqdn.rstrip(".").lower()
+                records = live_zone_records()
+                logger.info(
+                    "duplicate-check zone=%s fqdn_clean=%r type=%s live_record_count=%d sample=%r",
+                    zone.zone_name, fqdn_clean, item.record_type, len(records),
+                    [(r.name, r.record_type) for r in records[:10]],
+                )
                 duplicate = next(
                     (
-                        r for r in live_zone_records()
+                        r for r in records
                         if r.name.rstrip(".").lower() == fqdn_clean and r.record_type == item.record_type
                     ),
                     None,
                 )
+                logger.info("duplicate-check result=%s", "FOUND:" + duplicate.ref if duplicate else "none")
                 if duplicate is not None:
                     raise ValidationError(
                         "fqdn",

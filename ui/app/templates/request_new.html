@@ -336,7 +336,15 @@ document.getElementById("create-label").addEventListener("input", updateFqdnPrev
 function checkCreateDuplicate(fqdn) {
   const warnEl = document.getElementById("create-duplicate-warning");
   const addBtn = document.getElementById("create-add");
-  if (!state.liveRecords) { warnEl.style.display = "none"; addBtn.disabled = false; return; }
+  if (!state.liveRecords) {
+    // Records haven't loaded (or failed to load) — fail CLOSED, not open.
+    // The backend re-checks authoritatively regardless, but the button
+    // should never look "clear" when we don't actually know the current state.
+    warnEl.textContent = "Records haven't finished loading from Micetro yet — please wait or retry on the Zone step.";
+    warnEl.style.display = "block";
+    addBtn.disabled = true;
+    return;
+  }
   const fqdnClean = fqdn.replace(/\.$/, "").toLowerCase();
   const dup = state.liveRecords.find(r =>
     r.fqdn.replace(/\.$/, "").toLowerCase() === fqdnClean && r.record_type === state.selectedCreateType);
