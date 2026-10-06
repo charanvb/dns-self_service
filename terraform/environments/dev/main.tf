@@ -1,10 +1,3 @@
-module "iam" {
-  source = "../../modules/iam"
-
-  project_id  = var.project_id
-  environment = var.environment
-}
-
 module "artifact_registry" {
   source = "../../modules/artifact_registry"
 
@@ -20,6 +13,6 @@ module "secret_manager" {
   project_id = var.project_id
   secret_ids = var.secret_ids
   accessor_members = [
-    "serviceAccount:${module.iam.runtime_service_account_email}",
+    "serviceAccount:${var.runtime_service_account_email}",
   ]
 }

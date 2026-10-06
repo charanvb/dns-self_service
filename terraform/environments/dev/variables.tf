@@ -14,6 +14,13 @@ variable "environment" {
   default     = "dev"
 }
 
+# Reusing the existing GitHub Actions deploy SA as the Cloud Run runtime identity too
+# (no separate least-privilege runtime SA for now, per user decision).
+variable "runtime_service_account_email" {
+  type    = string
+  default = "ul-fs-t-902550-svc01@ul-fs-t-902550-prj.iam.gserviceaccount.com"
+}
+
 # Secrets whose containers already exist (created manually via Console) and
 # must be imported into state before the first `terraform apply` — see README.
 # Remaining secrets are declared here too; Terraform creates their containers.
