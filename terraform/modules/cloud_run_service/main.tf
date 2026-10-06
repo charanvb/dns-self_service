@@ -49,7 +49,15 @@ resource "google_cloud_run_v2_service" "this" {
   }
 
   lifecycle {
-    ignore_changes = [template[0].containers[0].image]
+    ignore_changes = [
+      client,
+      client_version,
+      # IAP is enabled via Console (Security tab) and stored as a service
+      # annotation — not declared here, so without this Terraform would
+      # strip it back out on every apply.
+      annotations,
+      template[0].containers[0].image,
+    ]
   }
 }
 
