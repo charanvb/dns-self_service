@@ -41,7 +41,7 @@ resource "google_cloud_run_v2_job" "this" {
             network    = var.vpc_network
             subnetwork = var.vpc_subnetwork
           }
-          egress = "PRIVATE_RANGES_ONLY"
+          egress = var.vpc_egress
         }
       }
     }

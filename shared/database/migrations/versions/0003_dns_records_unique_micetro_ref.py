@@ -1,13 +1,13 @@
 """Add unique constraint for upsert-safe record sync
 
-Revision ID: 0003_dns_records_unique_micetro_ref
+Revision ID: 0003_dns_records_uniq
 Revises: 0002_add_local_test_users
 Create Date: 2026-10-07
 
 """
 from alembic import op
 
-revision = "0003_dns_records_unique_micetro_ref"
+revision = "0003_dns_records_uniq"
 down_revision = "0002_add_local_test_users"
 branch_labels = None
 depends_on = None

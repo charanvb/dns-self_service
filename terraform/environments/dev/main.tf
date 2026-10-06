@@ -44,6 +44,7 @@ module "inventory_sync_job" {
   service_account_email = var.runtime_service_account_email
   vpc_network           = var.vpc_network
   vpc_subnetwork        = var.vpc_subnetwork
+  vpc_egress            = "ALL_TRAFFIC" # Micetro is only reachable via the corporate/Azure network path
   timeout               = "3600s"
   env_vars = [
     { name = "MICETRO_API_URL", value = "https://ssportal-qa.unilever.com/mmws/api/v2" },

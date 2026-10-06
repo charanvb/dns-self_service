@@ -43,3 +43,9 @@ variable "vpc_subnetwork" {
   type    = string
   default = null
 }
+
+variable "vpc_egress" {
+  type        = string
+  default     = "PRIVATE_RANGES_ONLY"
+  description = "PRIVATE_RANGES_ONLY (only RFC1918 traffic via VPC) or ALL_TRAFFIC (route everything via VPC, needed when the destination is only reachable through the corporate/Azure network path even though it resolves to a public-looking hostname)"
+}
