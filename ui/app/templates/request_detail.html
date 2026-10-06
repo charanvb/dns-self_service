@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Request #{{ request_id }} — DNS Self-Service{% endblock %}
+{% block body %}
+<div class="topbar">
+  <div class="brand"><span class="logo-dot"></span> DNS Self-Service</div>
+  <div class="user-menu">
+    <span>{{ username }}</span>
+    <button id="logout-btn">Logout</button>
+  </div>
+</div>
+
+<div class="page">
+  <a class="back-link" href="/requests">&larr; Back to my requests</a>
+  <h1 class="welcome">Request #{{ request_id }}</h1>
+  <div id="content"></div>
+</div>
+
+<script>
+async function load() {
+  const res = await fetch("/api/requests/{{ request_id }}");
+  const el = document.getElementById("content");
+  if (!res.ok) {
+    el.innerHTML = `<div class="empty-state">Request not found.</div>`;
+    return;
+  }
+  const r = await res.json();
+  const rows = r.items.map(i => `
+    <div class="review-item">
+      <div class="details">
+        <span class="action-badge ${i.action.toLowerCase()}">${i.action}</span>
+        <span class="record-type-badge">${i.record_type}</span>
+        <strong>${i.fqdn}</strong> &mdash; TTL ${i.ttl ?? ""}
+      </div>
+      <span class="status-badge ${i.status}">${i.status}</span>
+    </div>`).join("");
+  el.innerHTML = `
+    <div class="panel">
+      <p><span class="status-badge ${r.status}">${r.status.replace("_"," ")}</span></p>
+      ${r.justification ? `<p class="hint">${r.justification}</p>` : ""}
+      <h2>Changes</h2>
+      ${rows}
+    </div>`;
+}
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  await fetch("/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+});
+load();
+</script>
+{% endblock %}

@@ -44,3 +44,29 @@ def dashboard_page(request: Request):
         "dashboard.html",
         {"request": request, "username": payload["username"], "roles": payload["roles"]},
     )
+
+
+@router.get("/requests/new", response_class=HTMLResponse)
+def new_request_page(request: Request):
+    payload = get_current_user_for_page(request)
+    if not payload:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("request_new.html", {"request": request, "username": payload["username"]})
+
+
+@router.get("/requests", response_class=HTMLResponse)
+def my_requests_page(request: Request):
+    payload = get_current_user_for_page(request)
+    if not payload:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("requests_list.html", {"request": request, "username": payload["username"]})
+
+
+@router.get("/requests/{request_id}", response_class=HTMLResponse)
+def request_detail_page(request: Request, request_id: int):
+    payload = get_current_user_for_page(request)
+    if not payload:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(
+        "request_detail.html", {"request": request, "username": payload["username"], "request_id": request_id}
+    )

@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% block title %}New DNS Request — DNS Self-Service{% endblock %}
+{% block body %}
+<div class="topbar">
+  <div class="brand"><span class="logo-dot"></span> DNS Self-Service</div>
+  <div class="user-menu">
+    <span>{{ username }}</span>
+    <button id="logout-btn">Logout</button>
+  </div>
+</div>
+
+<div class="page">
+  <a class="back-link" href="/dashboard">&larr; Back to dashboard</a>
+  <h1 class="welcome">New DNS Request</h1>
+
+  <div class="steps">
+    <div class="step" data-step="zone">1. Zone</div>
+    <div class="step" data-step="action">2. Action</div>
+    <div class="step" data-step="details">3. Details</div>
+    <div class="step" data-step="review">4. Review &amp; Submit</div>
+  </div>
+
+  <!-- Step 1: Zone -->
+  <div class="panel" id="panel-zone">
+    <h2>Which zone do you want to change?</h2>
+    <div class="search-box">
+      <input id="zone-search" type="text" placeholder="Search zones (e.g. example.com)" autocomplete="off" />
+      <div class="search-results" id="zone-results"></div>
+    </div>
+    <div id="zone-selected" style="margin-top:16px;"></div>
+    <div class="btn-row">
+      <span></span>
+      <button class="btn btn-primary" id="zone-next" disabled>Next &rarr;</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Action -->
+  <div class="panel" id="panel-action" style="display:none;">
+    <h2>What do you want to do in <span id="action-zone-name"></span>?</h2>
+    <div class="action-grid">
+      <div class="action-choice create" data-action="CREATE">
+        <div class="icon">➕</div>
+        <div class="label">Create</div>
+        <div class="card-desc">Add a new DNS record</div>
+      </div>
+      <div class="action-choice modify" data-action="MODIFY">
+        <div class="icon">✏️</div>
+        <div class="label">Modify</div>
+        <div class="card-desc">Change an existing record</div>
+      </div>
+      <div class="action-choice delete" data-action="DELETE">
+        <div class="icon">🗑️</div>
+        <div class="label">Delete</div>
+        <div class="card-desc">Remove existing record(s)</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="action-back">&larr; Back</button>
+      <button class="btn btn-primary" id="action-next" disabled>Next &rarr;</button>
+    </div>
+  </div>
+
+  <!-- Step 3a: CREATE details -->
+  <div class="panel" id="panel-create" style="display:none;">
+    <h2>Create a new record</h2>
+    <div class="type-chips" id="type-chips"></div>
+
+    <div class="field-grid">
+      <div class="full">
+        <label>FQDN label</label>
+        <input id="create-label" type="text" placeholder="e.g. server (leave blank for zone apex)" />
+        <div class="fqdn-preview">
+          <span id="fqdn-preview-text">your-zone.com</span>
+        </div>
+      </div>
+      <div>
+        <label>TTL (seconds)</label>
+        <input id="create-ttl" type="number" value="300" />
+        <div class="field-error" id="create-ttl-error"></div>
+      </div>
+    </div>
+
+    <div class="field-grid" id="dynamic-fields"></div>
+    <div class="form-error" id="create-error"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="create-back">&larr; Back</button>
+      <button class="btn btn-primary" id="create-add">Add to request</button>
+    </div>
+  </div>
+
+  <!-- Step 3b: MODIFY / DELETE — record search -->
+  <div class="panel" id="panel-record-search" style="display:none;">
+    <h2 id="record-search-title">Find the record</h2>
+    <div class="field-grid">
+      <div>
+        <input id="record-search-input" type="text" placeholder="Search by name (e.g. server)" autocomplete="off" />
+      </div>
+      <div>
+        <select id="record-type-filter" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;">
+          <option value="">All types</option>
+        </select>
+      </div>
+    </div>
+    <div id="record-results"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="record-search-back">&larr; Back</button>
+      <span></span>
+    </div>
+  </div>
+
+  <!-- Step 3c: MODIFY — edit selected record -->
+  <div class="panel" id="panel-modify-edit" style="display:none;">
+    <h2>Modify record</h2>
+    <div class="fqdn-preview" id="modify-fqdn"></div>
+    <div class="field-grid">
+      <div>
+        <label>TTL (seconds)</label>
+        <input id="modify-ttl" type="number" value="300" />
+      </div>
+    </div>
+    <div class="field-grid" id="modify-dynamic-fields"></div>
+    <div class="form-error" id="modify-error"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="modify-back">&larr; Back</button>
+      <button class="btn btn-primary" id="modify-add">Add to request</button>
+    </div>
+  </div>
+
+  <!-- Step 3d: DELETE — confirm -->
+  <div class="panel" id="panel-delete-confirm" style="display:none;">
+    <h2>Confirm deletion</h2>
+    <div class="fqdn-preview" id="delete-fqdn"></div>
+    <div class="confirm-box">
+      <label>Type the full FQDN to confirm deletion</label>
+      <input id="delete-confirm-input" type="text" placeholder="Type FQDN exactly" autocomplete="off" />
+      <div class="field-error" id="delete-confirm-error"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="delete-back">&larr; Back</button>
+      <button class="btn btn-danger" id="delete-add" disabled>Add deletion to request</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Review -->
+  <div class="panel" id="panel-review" style="display:none;">
+    <h2>Review your request</h2>
+    <div id="review-list"></div>
+    <div id="review-empty" class="empty-state" style="display:none;">No changes added yet.</div>
+
+    <div class="field-grid" style="margin-top:16px;">
+      <div class="full">
+        <label>Justification (optional)</label>
+        <textarea id="justification" rows="2" placeholder="Why is this change needed?"></textarea>
+      </div>
+    </div>
+    <div class="form-error" id="submit-error"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="review-add-another">+ Add another change</button>
+      <button class="btn btn-primary" id="submit-request">Submit request</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FIELD_DEFS = {
+  A: [{name:"ipv4", label:"IPv4 Address", placeholder:"10.10.10.10"}],
+  AAAA: [{name:"ipv6", label:"IPv6 Address", placeholder:"2001:db8::1"}],
+  CNAME: [{name:"target", label:"Target (FQDN)", placeholder:"backend.example.com"}],
+  TXT: [{name:"text", label:"TXT Value", placeholder:'"v=spf1 include:example.com -all"', textarea:true}],
+  MX: [{name:"priority", label:"Priority", placeholder:"10"}, {name:"target", label:"Mail Server (FQDN)", placeholder:"mail.example.com"}],
+};
+const RECORD_TYPES = Object.keys(FIELD_DEFS);
+
+const state = { zone: null, action: null, items: [], recordSearchMode: null, selectedRecord: null, selectedCreateType: "A" };
+
+function showPanel(id) {
+  ["panel-zone","panel-action","panel-create","panel-record-search","panel-modify-edit","panel-delete-confirm","panel-review"]
+    .forEach(p => document.getElementById(p).style.display = (p === id ? "block" : "none"));
+  const stepMap = { "panel-zone":"zone", "panel-action":"action", "panel-create":"details",
+    "panel-record-search":"details", "panel-modify-edit":"details", "panel-delete-confirm":"details", "panel-review":"review" };
+  document.querySelectorAll(".step").forEach(s => {
+    s.classList.toggle("active", s.dataset.step === stepMap[id]);
+  });
+}
+
+function toast(message, type) {
+  const el = document.createElement("div");
+  el.className = "toast " + (type || "");
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+// ---- Step 1: zone search ----
+const zoneSearchInput = document.getElementById("zone-search");
+const zoneResults = document.getElementById("zone-results");
+
+const runZoneSearch = debounce(async (q) => {
+  if (!q.trim()) { zoneResults.classList.remove("open"); return; }
+  const res = await fetch("/api/zones?search=" + encodeURIComponent(q) + "&page_size=15");
+  const data = await res.json();
+  zoneResults.innerHTML = "";
+  if (data.items.length === 0) {
+    zoneResults.innerHTML = '<div class="search-result-empty">No zones found</div>';
+  } else {
+    data.items.forEach(z => {
+      const div = document.createElement("div");
+      div.className = "search-result-item";
+      div.innerHTML = `<span>${z.zone_name}</span>` + (z.requires_approval ? '<span class="badge">Approval required</span>' : "");
+      div.addEventListener("click", () => selectZone(z));
+      zoneResults.appendChild(div);
+    });
+  }
+  zoneResults.classList.add("open");
+}, 250);
+
+zoneSearchInput.addEventListener("input", (e) => runZoneSearch(e.target.value));
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".search-box")) zoneResults.classList.remove("open");
+});
+
+function selectZone(zone) {
+  state.zone = zone;
+  zoneResults.classList.remove("open");
+  zoneSearchInput.value = "";
+  document.getElementById("zone-selected").innerHTML =
+    `<span class="selected-zone-chip">${zone.zone_name} <button id="zone-clear">&times;</button></span>`;
+  document.getElementById("zone-clear").addEventListener("click", () => {
+    state.zone = null;
+    document.getElementById("zone-selected").innerHTML = "";
+    document.getElementById("zone-next").disabled = true;
+  });
+  document.getElementById("zone-next").disabled = false;
+}
+
+document.getElementById("zone-next").addEventListener("click", () => {
+  document.getElementById("action-zone-name").textContent = state.zone.zone_name;
+  showPanel("panel-action");
+});
+
+// ---- Step 2: action ----
+document.querySelectorAll(".action-choice").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll(".action-choice").forEach(e2 => e2.classList.remove("selected"));
+    el.classList.add("selected");
+    state.action = el.dataset.action;
+    document.getElementById("action-next").disabled = false;
+  });
+});
+document.getElementById("action-back").addEventListener("click", () => showPanel("panel-zone"));
+document.getElementById("action-next").addEventListener("click", () => {
+  if (state.action === "CREATE") {
+    renderTypeChips();
+    updateFqdnPreview();
+    showPanel("panel-create");
+  } else {
+    startRecordSearch(state.action);
+  }
+});
+
+// ---- Step 3a: CREATE ----
+function renderTypeChips() {
+  const el = document.getElementById("type-chips");
+  el.innerHTML = "";
+  RECORD_TYPES.forEach(t => {
+    const chip = document.createElement("div");
+    chip.className = "type-chip" + (t === state.selectedCreateType ? " selected" : "");
+    chip.textContent = t;
+    chip.addEventListener("click", () => {
+      state.selectedCreateType = t;
+      renderTypeChips();
+      renderDynamicFields("dynamic-fields", t);
+    });
+    el.appendChild(chip);
+  });
+  renderDynamicFields("dynamic-fields", state.selectedCreateType);
+}
+
+function renderDynamicFields(containerId, recordType) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = "";
+  FIELD_DEFS[recordType].forEach(f => {
+    const wrap = document.createElement("div");
+    if (f.textarea) wrap.className = "full";
+    wrap.innerHTML = `<label>${f.label}</label>` +
+      (f.textarea ? `<textarea data-field="${f.name}" rows="3" placeholder="${f.placeholder}"></textarea>`
+                  : `<input data-field="${f.name}" type="text" placeholder="${f.placeholder}" />`);
+    el.appendChild(wrap);
+  });
+}
+
+function updateFqdnPreview() {
+  const label = document.getElementById("create-label").value.trim();
+  const zoneName = state.zone ? state.zone.zone_name : "your-zone.com";
+  const fqdn = label ? `${label}.${zoneName}` : zoneName;
+  document.getElementById("fqdn-preview-text").innerHTML =
+    label ? `<strong>${label}</strong>.<span class="zone-part">${zoneName}</span>` : `<span class="zone-part">${zoneName}</span> (zone apex)`;
+  return fqdn;
+}
+document.getElementById("create-label").addEventListener("input", updateFqdnPreview);
+
+document.getElementById("create-back").addEventListener("click", () => showPanel("panel-action"));
+document.getElementById("create-add").addEventListener("click", () => {
+  const errEl = document.getElementById("create-error");
+  errEl.style.display = "none";
+  const fqdn = updateFqdnPreview();
+  const ttl = parseInt(document.getElementById("create-ttl").value, 10);
+  const value = {};
+  document.querySelectorAll("#dynamic-fields [data-field]").forEach(inp => { value[inp.dataset.field] = inp.value; });
+
+  if (!ttl || ttl < 60 || ttl > 86400) {
+    document.getElementById("create-ttl-error").textContent = "TTL must be between 60 and 86400";
+    return;
+  }
+  document.getElementById("create-ttl-error").textContent = "";
+
+  state.items.push({
+    action: "CREATE", record_type: state.selectedCreateType, fqdn, ttl, value,
+    _display: { fqdn, summary: Object.values(value).join(" ") },
+  });
+  toast("Added to request", "success");
+  renderReview();
+  showPanel("panel-review");
+});
+
+// ---- Step 3b: record search (MODIFY / DELETE) ----
+const recordTypeFilter = document.getElementById("record-type-filter");
+RECORD_TYPES.forEach(t => {
+  const opt = document.createElement("option");
+  opt.value = t; opt.textContent = t;
+  recordTypeFilter.appendChild(opt);
+});
+
+function startRecordSearch(mode) {
+  state.recordSearchMode = mode;
+  document.getElementById("record-search-title").textContent =
+    mode === "MODIFY" ? "Find the record to modify" : "Find the record(s) to delete";
+  document.getElementById("record-search-input").value = "";
+  document.getElementById("record-results").innerHTML = "";
+  runRecordSearch("");
+  showPanel("panel-record-search");
+}
+
+const runRecordSearch = debounce(async (q) => {
+  const type = recordTypeFilter.value;
+  const params = new URLSearchParams({ search: q, page_size: "20" });
+  if (type) params.set("type", type);
+  const res = await fetch(`/api/zones/${state.zone.id}/records?` + params.toString());
+  const data = await res.json();
+  const el = document.getElementById("record-results");
+  el.innerHTML = "";
+  if (data.items.length === 0) {
+    el.innerHTML = '<div class="search-result-empty">No records found</div>';
+    return;
+  }
+  data.items.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "record-row";
+    row.innerHTML = `<div><span class="record-type-badge">${r.record_type}</span><span class="fqdn">${r.fqdn}</span>
+      <div class="meta">TTL ${r.ttl} &middot; ${r.value}</div></div>`;
+    row.addEventListener("click", () => {
+      state.selectedRecord = r;
+      if (state.recordSearchMode === "MODIFY") startModifyEdit(r); else startDeleteConfirm(r);
+    });
+    el.appendChild(row);
+  });
+}, 250);
+
+document.getElementById("record-search-input").addEventListener("input", (e) => runRecordSearch(e.target.value));
+recordTypeFilter.addEventListener("change", () => runRecordSearch(document.getElementById("record-search-input").value));
+document.getElementById("record-search-back").addEventListener("click", () => showPanel("panel-action"));
+
+// ---- Step 3c: MODIFY edit ----
+function startModifyEdit(record) {
+  document.getElementById("modify-fqdn").innerHTML =
+    `<span class="record-type-badge">${record.record_type}</span>${record.fqdn}`;
+  document.getElementById("modify-ttl").value = record.ttl;
+  renderDynamicFields("modify-dynamic-fields", record.record_type);
+  showPanel("panel-modify-edit");
+}
+document.getElementById("modify-back").addEventListener("click", () => showPanel("panel-record-search"));
+document.getElementById("modify-add").addEventListener("click", () => {
+  const record = state.selectedRecord;
+  const ttl = parseInt(document.getElementById("modify-ttl").value, 10);
+  const value = {};
+  document.querySelectorAll("#modify-dynamic-fields [data-field]").forEach(inp => { value[inp.dataset.field] = inp.value; });
+
+  if (!ttl || ttl < 60 || ttl > 86400) {
+    document.getElementById("modify-error").textContent = "TTL must be between 60 and 86400";
+    document.getElementById("modify-error").style.display = "block";
+    return;
+  }
+  document.getElementById("modify-error").style.display = "none";
+
+  state.items.push({
+    action: "MODIFY", record_type: record.record_type, fqdn: record.fqdn, ttl, value,
+    source_record_id: record.id,
+    _display: { fqdn: record.fqdn, summary: Object.values(value).join(" ") },
+  });
+  toast("Added to request", "success");
+  renderReview();
+  showPanel("panel-review");
+});
+
+// ---- Step 3d: DELETE confirm ----
+function startDeleteConfirm(record) {
+  document.getElementById("delete-fqdn").innerHTML =
+    `<span class="record-type-badge">${record.record_type}</span>${record.fqdn} &middot; TTL ${record.ttl} &middot; ${record.value}`;
+  document.getElementById("delete-confirm-input").value = "";
+  document.getElementById("delete-confirm-error").textContent = "";
+  document.getElementById("delete-add").disabled = true;
+  showPanel("panel-delete-confirm");
+}
+document.getElementById("delete-confirm-input").addEventListener("input", (e) => {
+  const match = e.target.value.trim().replace(/\.$/, "") === state.selectedRecord.fqdn.replace(/\.$/, "");
+  document.getElementById("delete-add").disabled = !match;
+  document.getElementById("delete-confirm-error").textContent = match || !e.target.value ? "" : "Does not match the record's FQDN";
+});
+document.getElementById("delete-back").addEventListener("click", () => showPanel("panel-record-search"));
+document.getElementById("delete-add").addEventListener("click", () => {
+  const record = state.selectedRecord;
+  state.items.push({
+    action: "DELETE", record_type: record.record_type, fqdn: record.fqdn, ttl: record.ttl, value: {},
+    source_record_id: record.id,
+    _display: { fqdn: record.fqdn, summary: "Delete existing " + record.record_type + " record" },
+  });
+  toast("Deletion added to request", "success");
+  renderReview();
+  showPanel("panel-review");
+});
+
+// ---- Step 4: review + submit ----
+function renderReview() {
+  const el = document.getElementById("review-list");
+  const empty = document.getElementById("review-empty");
+  el.innerHTML = "";
+  empty.style.display = state.items.length === 0 ? "block" : "none";
+  state.items.forEach((item, idx) => {
+    const row = document.createElement("div");
+    row.className = "review-item";
+    row.innerHTML = `<div class="details">
+        <span class="action-badge ${item.action.toLowerCase()}">${item.action}</span>
+        <span class="record-type-badge">${item.record_type}</span>
+        <strong>${item._display.fqdn}</strong> &mdash; ${item._display.summary}
+      </div>`;
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "remove-btn";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => { state.items.splice(idx, 1); renderReview(); });
+    row.appendChild(removeBtn);
+    el.appendChild(row);
+  });
+}
+
+document.getElementById("review-add-another").addEventListener("click", () => showPanel("panel-action"));
+
+document.getElementById("submit-request").addEventListener("click", async () => {
+  const errEl = document.getElementById("submit-error");
+  errEl.style.display = "none";
+  if (state.items.length === 0) {
+    errEl.textContent = "Add at least one change before submitting.";
+    errEl.style.display = "block";
+    return;
+  }
+  const payload = {
+    zone_id: state.zone.id,
+    justification: document.getElementById("justification").value || null,
+    items: state.items.map(({ _display, ...rest }) => rest),
+  };
+  const btn = document.getElementById("submit-request");
+  btn.disabled = true;
+  btn.textContent = "Submitting...";
+  try {
+    const res = await fetch("/api/requests", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      toast("Request submitted!", "success");
+      window.location.href = "/requests/" + data.id;
+      return;
+    }
+    const err = await res.json();
+    errEl.textContent = (err.detail && err.detail.message) ? err.detail.message : "Could not submit the request.";
+    errEl.style.display = "block";
+  } catch (e) {
+    errEl.textContent = "Could not reach the server.";
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Submit request";
+  }
+});
+
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  await fetch("/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+});
+
+showPanel("panel-zone");
+</script>
+{% endblock %}

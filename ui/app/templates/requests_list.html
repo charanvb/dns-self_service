@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}My Requests — DNS Self-Service{% endblock %}
+{% block body %}
+<div class="topbar">
+  <div class="brand"><span class="logo-dot"></span> DNS Self-Service</div>
+  <div class="user-menu">
+    <span>{{ username }}</span>
+    <button id="logout-btn">Logout</button>
+  </div>
+</div>
+
+<div class="page">
+  <a class="back-link" href="/dashboard">&larr; Back to dashboard</a>
+  <h1 class="welcome">My Requests</h1>
+  <div id="content"></div>
+</div>
+
+<script>
+async function load() {
+  const res = await fetch("/api/requests");
+  const items = await res.json();
+  const el = document.getElementById("content");
+  if (items.length === 0) {
+    el.innerHTML = `<div class="empty-state">No requests yet. <a href="/requests/new">Create your first DNS request</a>.</div>`;
+    return;
+  }
+  const rows = items.map(r => `
+    <tr>
+      <td><a href="/requests/${r.id}">#${r.id}</a></td>
+      <td>${r.zone_name}</td>
+      <td><span class="status-badge ${r.status}">${r.status.replace("_"," ")}</span></td>
+      <td>${new Date(r.created_at).toLocaleString()}</td>
+    </tr>`).join("");
+  el.innerHTML = `<table class="requests-table">
+    <thead><tr><th>ID</th><th>Zone</th><th>Status</th><th>Created</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  await fetch("/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+});
+load();
+</script>
+{% endblock %}
