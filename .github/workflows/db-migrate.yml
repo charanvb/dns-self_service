@@ -1,0 +1,51 @@
+name: db-migrate
+
+on:
+  push:
+    branches: [main]
+    paths: ["shared/database/**", "shared/models/**"]
+  workflow_dispatch: {}
+
+env:
+  IMAGE: europe-west4-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dns-self-service/db-migrate
+
+jobs:
+  migrate:
+    name: build, push & run migrations
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: configure docker auth
+        run: gcloud auth configure-docker europe-west4-docker.pkg.dev --quiet
+
+      - name: build image
+        run: docker build -f shared/database/Dockerfile -t ${{ env.IMAGE }}:${{ github.sha }} -t ${{ env.IMAGE }}:latest .
+
+      - name: push image
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: deploy job revision
+        run: |
+          gcloud run jobs update dns-self-service-db-migrate \
+            --image=${{ env.IMAGE }}:${{ github.sha }} \
+            --region=${{ vars.GCP_REGION }} \
+            --project=${{ vars.GCP_PROJECT_ID }}
+
+      - name: execute migration job
+        run: |
+          gcloud run jobs execute dns-self-service-db-migrate \
+            --region=${{ vars.GCP_REGION }} \
+            --project=${{ vars.GCP_PROJECT_ID }} \
+            --wait

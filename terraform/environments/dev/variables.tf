@@ -36,3 +36,17 @@ variable "secret_ids" {
     "app-auth-signing-key",
   ]
 }
+
+# VPC network/subnetwork that has connectivity to the Azure PostgreSQL instance.
+# This is a Shared VPC — network/subnet live in the host project
+# ul-fs-n-plnetwork-prj, not in this (service) project, so full resource paths
+# are required rather than short names.
+variable "vpc_network" {
+  type    = string
+  default = "projects/ul-fs-n-plnetwork-prj/global/networks/ul-fs-n-plvpc-01"
+}
+
+variable "vpc_subnetwork" {
+  type    = string
+  default = "projects/ul-fs-n-plnetwork-prj/regions/europe-west4/subnetworks/gnl-ec-n-subnet-01"
+}
