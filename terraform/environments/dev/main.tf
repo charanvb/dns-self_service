@@ -34,6 +34,32 @@ module "db_migrate_job" {
   depends_on = [module.secret_manager]
 }
 
+module "inventory_sync_job" {
+  source = "../../modules/cloud_run_job"
+
+  project_id            = var.project_id
+  location              = var.region
+  job_name              = "dns-self-service-inventory-sync"
+  image                 = "us-docker.pkg.dev/cloudrun/container/job:latest" # placeholder, replaced by CI
+  service_account_email = var.runtime_service_account_email
+  vpc_network           = var.vpc_network
+  vpc_subnetwork        = var.vpc_subnetwork
+  timeout               = "3600s"
+  env_vars = [
+    { name = "MICETRO_API_URL", value = "https://ssportal-qa.unilever.com/mmws/api/v2" },
+    # Scoped to a small subset for the first test run — raise/remove once verified.
+    { name = "SYNC_MAX_ZONES", value = "50" },
+    { name = "SYNC_PAGE_SIZE", value = "200" },
+  ]
+  secret_env_vars = [
+    { name = "DATABASE_URL", secret_id = "db-connection-string" },
+    { name = "MICETRO_API_USERNAME", secret_id = "micetro-api-username" },
+    { name = "MICETRO_API_PASSWORD", secret_id = "micetro-api-password" },
+  ]
+
+  depends_on = [module.secret_manager]
+}
+
 module "ui_service" {
   source = "../../modules/cloud_run_service"
 

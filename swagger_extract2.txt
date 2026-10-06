@@ -1,0 +1,462 @@
+=== components.schemas.GetDNSZonesResponse ===
+{
+  "type": "object",
+  "properties": {
+    "dnsZones": {
+      "description": "List of zones.",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/DNSZone"
+      }
+    },
+    "offset": {
+      "description": "Offset of page returned when \"targetRef\" is specified and found.",
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    },
+    "totalResults": {
+      "description": "Total number of items in the result set.",
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "dnsZones",
+    "totalResults"
+  ]
+}
+
+=== components.schemas.GetDNSRecordsResponse ===
+{
+  "type": "object",
+  "properties": {
+    "dnsRecords": {
+      "description": "List of records.",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/DNSRecord"
+      }
+    },
+    "offset": {
+      "description": "Offset of page returned when \"targetRef\" is specified and found.",
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    },
+    "totalResults": {
+      "description": "Total number of items in the result set.",
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "dnsRecords",
+    "totalResults"
+  ]
+}
+
+=== components.parameters.filterParam ===
+{
+  "name": "filter",
+  "description": "Criteria for filtering the returned items.",
+  "schema": {
+    "type": "string"
+  },
+  "in": "query"
+}
+
+=== components.parameters.offsetParam ===
+{
+  "name": "offset",
+  "description": "Offset specification for listing records. A value of 0 starts with the first item.",
+  "schema": {
+    "type": "integer",
+    "format": "int64",
+    "minimum": 0
+  },
+  "in": "query"
+}
+
+=== components.parameters.limitParam ===
+{
+  "name": "limit",
+  "description": "The number of items to return.",
+  "schema": {
+    "type": "integer",
+    "format": "int64",
+    "minimum": 0
+  },
+  "in": "query"
+}
+
+=== components.parameters.sortByParam ===
+{
+  "name": "sortBy",
+  "description": "The field name to sort by.",
+  "schema": {
+    "type": "string"
+  },
+  "in": "query"
+}
+
+=== components.parameters.sortOrderParam ===
+{
+  "name": "sortOrder",
+  "description": "The sort order to use.",
+  "schema": {
+    "type": "string",
+    "enum": [
+      "Ascending",
+      "Descending"
+    ]
+  },
+  "in": "query"
+}
+
+=== components.parameters.objTypeParam ===
+{
+  "name": "objType",
+  "description": "The type of object to retrieve. If not specified, entries for all object types are retrieved.",
+  "schema": {
+    "type": "string",
+    "enum": [
+      "Unknown",
+      "Suite",
+      "DNSServer",
+      "DHCPServer",
+      "DNSZone",
+      "DNSView",
+      "Range",
+      "DHCPScope",
+      "IPAddress",
+      "DHCPReservation",
+      "DHCPAddressPool",
+      "DHCPGroup",
+      "ADSite",
+      "DNSRecord",
+      "User",
+      "Group",
+      "DHCPExclusion",
+      "DHCPFailoverPeer",
+      "DHCPLease",
+      "Device",
+      "Interface",
+      "Folder",
+      "DHCPSuperscope",
+      "ADSiteLink",
+      "AddressSpace",
+      "ADForest",
+      "Appliance",
+      "ChangeRequest",
+      "CloudServiceAccount",
+      "CloudNetwork",
+      "Role",
+      "XDNSGroup",
+      "ReportDefinition",
+      "Report",
+      "CloudService",
+      "CloudAccountSubscription",
+      "ClientClass",
+      "Policy",
+      "Agent",
+      "Service",
+      "XDNSProfile",
+      "Organization"
+    ]
+  },
+  "in": "query"
+}
+
+=== components.schemas.ObjRef ===
+{
+  "description": "A reference to an object.",
+  "type": "string"
+}
+
+=== components.schemas.DNSRecordType ===
+{
+  "description": "Defines possible DNS record types.",
+  "type": "string",
+  "enum": [
+    "Any",
+    "Unknown",
+    "A",
+    "NS",
+    "CNAME",
+    "SOA",
+    "WKS",
+    "PTR",
+    "HINFO",
+    "MX",
+    "TXT",
+    "SPF",
+    "RP",
+    "AFSDB",
+    "AAAA",
+    "LOC",
+    "SRV",
+    "NAPTR",
+    "DNAME",
+    "WINS",
+    "WINSR",
+    "SSHFP",
+    "DHCID",
+    "CERT",
+    "CAA",
+    "URI",
+    "ALIAS",
+    "CSYNC",
+    "SVCB",
+    "HTTPS",
+    "RRSIG",
+    "DS",
+    "DNSKEY",
+    "NSEC",
+    "NSEC3",
+    "NSEC3PARAM",
+    "TLSA",
+    "CDS",
+    "CDNSKEY",
+    "Comment",
+    "EmptyLine",
+    "$GENERATE",
+    "$INCLUDE",
+    "$TTL"
+  ]
+}
+
+--- components.schemas.DNSRecordType full enum values ---
+[
+  "Any",
+  "Unknown",
+  "A",
+  "NS",
+  "CNAME",
+  "SOA",
+  "WKS",
+  "PTR",
+  "HINFO",
+  "MX",
+  "TXT",
+  "SPF",
+  "RP",
+  "AFSDB",
+  "AAAA",
+  "LOC",
+  "SRV",
+  "NAPTR",
+  "DNAME",
+  "WINS",
+  "WINSR",
+  "SSHFP",
+  "DHCID",
+  "CERT",
+  "CAA",
+  "URI",
+  "ALIAS",
+  "CSYNC",
+  "SVCB",
+  "HTTPS",
+  "RRSIG",
+  "DS",
+  "DNSKEY",
+  "NSEC",
+  "NSEC3",
+  "NSEC3PARAM",
+  "TLSA",
+  "CDS",
+  "CDNSKEY",
+  "Comment",
+  "EmptyLine",
+  "$GENERATE",
+  "$INCLUDE",
+  "$TTL"
+]
+
+=== components.schemas.DNSZoneType ===
+{
+  "description": "Defines possible types for a DNS zone.",
+  "type": "string",
+  "enum": [
+    "Master",
+    "Slave",
+    "Primary",
+    "Secondary",
+    "Hint",
+    "Stub",
+    "Forward",
+    "Include",
+    "Static-stub",
+    "Options_Template",
+    "Private",
+    "Unknown"
+  ]
+}
+
+--- components.schemas.DNSZoneType full enum values ---
+[
+  "Master",
+  "Slave",
+  "Primary",
+  "Secondary",
+  "Hint",
+  "Stub",
+  "Forward",
+  "Include",
+  "Static-stub",
+  "Options_Template",
+  "Private",
+  "Unknown"
+]
+
+=== components.schemas.AddDNSRecord ===
+{
+  "type": "object",
+  "properties": {
+    "dnsRecord": {
+      "$ref": "#/components/schemas/DNSRecord"
+    },
+    "saveComment": {
+      "description": "Save comment text to associate with the action.",
+      "type": "string"
+    },
+    "placeAfterRef": {
+      "$ref": "#/components/schemas/ObjRef"
+    },
+    "forceOverrideOfNamingConflictCheck": {
+      "description": "Set to true to force creation of record regardless of naming conflict check (if enabled in system settings).",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "dnsRecord"
+  ]
+}
+
+=== components.schemas.AddDNSRecords ===
+{
+  "type": "object",
+  "properties": {
+    "dnsRecords": {
+      "description": "The DNS records to add.",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/DNSRecord"
+      }
+    },
+    "saveComment": {
+      "description": "Save comment text to associate with the action.",
+      "type": "string"
+    },
+    "dnsZoneRef": {
+      "$ref": "#/components/schemas/ObjRef"
+    },
+    "placeAfterRef": {
+      "$ref": "#/components/schemas/ObjRef"
+    },
+    "forceOverrideOfNamingConflictCheck": {
+      "description": "Set to true to force creation of record regardless of naming conflict check (if enabled in system settings).",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "dnsRecords"
+  ]
+}
+
+=== components.schemas.AddDNSZone ===
+{
+  "type": "object",
+  "properties": {
+    "dnsZone": {
+      "$ref": "#/components/schemas/DNSZone"
+    },
+    "zoneOptions": {
+      "$ref": "#/components/schemas/DNSZoneOptions"
+    },
+    "masters": {
+      "description": "The IP addresses of the master servers if the new zone is not a master zone.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "secondaries": {
+      "description": "The view references for secondary zones",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/ObjRef"
+      }
+    },
+    "records": {
+      "description": "Array of initial records for the new zone and the new default for the given view, only supported for AuthServe DNS services.",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/DNSRecord"
+      }
+    },
+    "saveComment": {
+      "description": "Save comment text to associate with the action.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "dnsZone"
+  ]
+}
+
+=== components.schemas.SetProperties ===
+{
+  "type": "object",
+  "properties": {
+    "ref": {
+      "$ref": "#/components/schemas/ObjRef"
+    },
+    "refs": {
+      "description": "Array of references to the objects for which properties should be set.",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/ObjRef"
+      }
+    },
+    "objType": {
+      "$ref": "#/components/schemas/ObjectType"
+    },
+    "saveComment": {
+      "description": "Save comment text to associate with the action.",
+      "type": "string"
+    },
+    "deleteUnspecified": {
+      "description": "Set to true if properties that are not explicitly set should be cleared.  Default value is false.",
+      "type": "boolean"
+    },
+    "properties": {
+      "$ref": "#/components/schemas/CustomPropertyMap"
+    }
+  },
+  "required": [
+    "properties"
+  ]
+}
+
+=== auth mechanism investigation ===
+components.securitySchemes:
+{
+  "Bearer token": {
+    "type": "http",
+    "description": "HTTP Bearer token authorization using a Micetro session ID as the token.\n\nWorks over `HTTP` and `HTTPS`, but `HTTPS` is **strongly recommended**\n\n---\nA session token can be created by sending a `POST` request to the [/sessions](/mmws/api/doc/#/micetro/post_micetro_sessions) endpoint with the user's credentials in the message body.",
+    "scheme": "bearer",
+    "bearerFormat": "Micetro session ID"
+  }
+}
+
+Occurrences of 'basic' (case-insensitive): 1
+Occurrences of 'Authorization' (case-insensitive): 3
+Occurrences of 'securitySchemes' (case-insensitive): 1
+
+--- Context snippets around 'basic' (case-insensitive) ---
+[Occurrence 1 at index 460027]:
+resses for the interface.","type":"array","items":{"type":"string"}},"customProperties":{"$ref":"#/components/schemas/CustomPropertyMap"},"deviceRef":{"$ref":"#/components/schemas/ObjRef"}},"required":["name"]},"LogFileInfo":{"description":"Contains basic info for a log file.","type":"object","properties":{"filename":{"description":"Filename of log file, relative to the log file folder.","type":"string"},"size":{"description":"Size of the file in bytes.","type":"integer","format":"int64","minimu

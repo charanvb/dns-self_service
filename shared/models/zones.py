@@ -55,4 +55,5 @@ class DnsRecord(TimestampMixin, Base):
         Index("ix_dns_records_zone_id", "zone_id"),
         Index("ix_dns_records_fqdn", "fqdn"),
         Index("ix_dns_records_record_type", "record_type"),
+        UniqueConstraint("zone_id", "micetro_ref", name="uq_dns_records_zone_micetro_ref"),
     )

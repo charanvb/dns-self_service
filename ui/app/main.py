@@ -3,12 +3,14 @@ from fastapi.staticfiles import StaticFiles
 
 from ui.app.routes.auth import router as auth_router
 from ui.app.routes.pages import router as pages_router
+from ui.app.routes.zones import router as zones_router
 
 app = FastAPI(title="DNS Self-Service Automation Platform")
 
 app.mount("/static", StaticFiles(directory="ui/app/static"), name="static")
 app.include_router(auth_router)
 app.include_router(pages_router)
+app.include_router(zones_router)
 
 
 @app.get("/healthz")
