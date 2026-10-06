@@ -72,9 +72,15 @@ module "ui_service" {
   allow_unauthenticated  = true
   vpc_network            = var.vpc_network
   vpc_subnetwork         = var.vpc_subnetwork
+  vpc_egress             = "ALL_TRAFFIC" # UI now calls Micetro live (request wizard) — same reachability fix as inventory-sync
+  env_vars = [
+    { name = "MICETRO_API_URL", value = "https://ssportal-qa.unilever.com/mmws/api/v2" },
+  ]
   secret_env_vars = [
     { name = "DATABASE_URL", secret_id = "db-connection-string" },
     { name = "APP_AUTH_SIGNING_KEY", secret_id = "app-auth-signing-key" },
+    { name = "MICETRO_API_USERNAME", secret_id = "micetro-api-username" },
+    { name = "MICETRO_API_PASSWORD", secret_id = "micetro-api-password" },
   ]
 
   depends_on = [module.secret_manager]

@@ -49,3 +49,9 @@ variable "vpc_subnetwork" {
   type    = string
   default = null
 }
+
+variable "vpc_egress" {
+  type        = string
+  default     = "PRIVATE_RANGES_ONLY"
+  description = "PRIVATE_RANGES_ONLY or ALL_TRAFFIC (needed when the service calls destinations only reachable via the corporate/Azure network path, e.g. Micetro)"
+}
