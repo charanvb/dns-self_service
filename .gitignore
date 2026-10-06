@@ -1,6 +1,8 @@
 # Internal notes / API docs — never commit
 DNS_App_notes.txt
 swagger_JSON_for_micetro_QA.json
+swagger_extract*.txt
+inspect_swagger.py
 
 # Secrets / local env
 .env
