@@ -38,6 +38,24 @@ class MicetroProvider(DNSProvider):
         ]
         return records, body["totalResults"]
 
+    def list_all_records(self, zone_ref: str, page_size: int = 500, safety_cap: int = 20000) -> list[RecordDTO]:
+        """Fetches every record in a zone directly from Micetro (no Postgres
+        cache) — used by the request wizard, which must never act on stale
+        inventory data. Deliberately slow for large zones; safety_cap guards
+        against a pathological infinite loop, not a feature limit."""
+        records: list[RecordDTO] = []
+        offset = 0
+        total = None
+        while total is None or offset < total:
+            batch, total = self.search_records(zone_ref, offset=offset, limit=page_size)
+            if not batch:
+                break
+            records.extend(batch)
+            offset += len(batch)
+            if offset >= safety_cap:
+                break
+        return records
+
     def get_record(self, record_ref: str) -> RecordDTO:
         body = self.client.get(f"/dnsRecords/{record_ref}")
         r = body["dnsRecord"]

@@ -28,6 +28,7 @@
       <div class="search-results" id="zone-results"></div>
     </div>
     <div id="zone-selected" style="margin-top:16px;"></div>
+    <div id="zone-load-status" style="margin-top:12px;"></div>
     <div class="btn-row">
       <span></span>
       <button class="btn btn-primary" id="zone-next" disabled>Next &rarr;</button>
@@ -72,6 +73,7 @@
         <div class="fqdn-preview">
           <span id="fqdn-preview-text">your-zone.com</span>
         </div>
+        <div class="form-error" id="create-duplicate-warning"></div>
       </div>
       <div>
         <label>TTL (seconds)</label>
@@ -173,7 +175,7 @@ const FIELD_DEFS = {
 };
 const RECORD_TYPES = Object.keys(FIELD_DEFS);
 
-const state = { zone: null, action: null, items: [], recordSearchMode: null, selectedRecord: null, selectedCreateType: "A" };
+const state = { zone: null, action: null, items: [], recordSearchMode: null, selectedRecord: null, selectedCreateType: "A", liveRecords: null, liveRecordsLoading: false };
 
 function showPanel(id) {
   ["panel-zone","panel-action","panel-create","panel-record-search","panel-modify-edit","panel-delete-confirm","panel-review"]
@@ -234,10 +236,33 @@ function selectZone(zone) {
     `<span class="selected-zone-chip">${zone.zone_name} <button id="zone-clear">&times;</button></span>`;
   document.getElementById("zone-clear").addEventListener("click", () => {
     state.zone = null;
+    state.liveRecords = null;
     document.getElementById("zone-selected").innerHTML = "";
+    document.getElementById("zone-load-status").innerHTML = "";
     document.getElementById("zone-next").disabled = true;
   });
-  document.getElementById("zone-next").disabled = false;
+  loadLiveRecords();
+}
+
+async function loadLiveRecords() {
+  state.liveRecords = null;
+  state.liveRecordsLoading = true;
+  document.getElementById("zone-next").disabled = true;
+  const statusEl = document.getElementById("zone-load-status");
+  statusEl.innerHTML = `<span class="hint loading-pulse">\u23f3 Loading records live from Micetro for this zone \u2014 this can take a moment for large zones...</span>`;
+  try {
+    const res = await fetch(`/api/zones/${state.zone.id}/live-records`);
+    if (!res.ok) throw new Error("fetch failed");
+    const data = await res.json();
+    state.liveRecords = data.items;
+    statusEl.innerHTML = `<span class="hint">\u2705 Loaded ${data.total} record(s) live from Micetro.</span>`;
+    document.getElementById("zone-next").disabled = false;
+  } catch (e) {
+    statusEl.innerHTML = `<span class="field-error">Could not load records from Micetro. <a href="#" id="retry-load">Retry</a></span>`;
+    document.getElementById("retry-load").addEventListener("click", (ev) => { ev.preventDefault(); loadLiveRecords(); });
+  } finally {
+    state.liveRecordsLoading = false;
+  }
 }
 
 document.getElementById("zone-next").addEventListener("click", () => {
@@ -277,6 +302,7 @@ function renderTypeChips() {
       state.selectedCreateType = t;
       renderTypeChips();
       renderDynamicFields("dynamic-fields", t);
+      updateFqdnPreview();
     });
     el.appendChild(chip);
   });
@@ -302,9 +328,27 @@ function updateFqdnPreview() {
   const fqdn = label ? `${label}.${zoneName}` : zoneName;
   document.getElementById("fqdn-preview-text").innerHTML =
     label ? `<strong>${label}</strong>.<span class="zone-part">${zoneName}</span>` : `<span class="zone-part">${zoneName}</span> (zone apex)`;
+  checkCreateDuplicate(fqdn);
   return fqdn;
 }
 document.getElementById("create-label").addEventListener("input", updateFqdnPreview);
+
+function checkCreateDuplicate(fqdn) {
+  const warnEl = document.getElementById("create-duplicate-warning");
+  const addBtn = document.getElementById("create-add");
+  if (!state.liveRecords) { warnEl.style.display = "none"; addBtn.disabled = false; return; }
+  const fqdnClean = fqdn.replace(/\.$/, "").toLowerCase();
+  const dup = state.liveRecords.find(r =>
+    r.fqdn.replace(/\.$/, "").toLowerCase() === fqdnClean && r.record_type === state.selectedCreateType);
+  if (dup) {
+    warnEl.textContent = `A ${state.selectedCreateType} record already exists for '${fqdn}' (value: ${dup.value}). Use Modify instead of Create.`;
+    warnEl.style.display = "block";
+    addBtn.disabled = true;
+  } else {
+    warnEl.style.display = "none";
+    addBtn.disabled = false;
+  }
+}
 
 document.getElementById("create-back").addEventListener("click", () => showPanel("panel-action"));
 document.getElementById("create-add").addEventListener("click", () => {
@@ -344,23 +388,27 @@ function startRecordSearch(mode) {
     mode === "MODIFY" ? "Find the record to modify" : "Find the record(s) to delete";
   document.getElementById("record-search-input").value = "";
   document.getElementById("record-results").innerHTML = "";
-  runRecordSearch("");
+  renderRecordResults("");
   showPanel("panel-record-search");
 }
 
-const runRecordSearch = debounce(async (q) => {
+// Filters the already-loaded live Micetro records in-memory — no network
+// call here, since the full live list was fetched once when the zone was
+// selected (loadLiveRecords).
+function renderRecordResults(q) {
   const type = recordTypeFilter.value;
-  const params = new URLSearchParams({ search: q, page_size: "20" });
-  if (type) params.set("type", type);
-  const res = await fetch(`/api/zones/${state.zone.id}/records?` + params.toString());
-  const data = await res.json();
+  const qLower = q.trim().toLowerCase();
+  const items = (state.liveRecords || []).filter(r =>
+    (!qLower || r.fqdn.toLowerCase().includes(qLower)) && (!type || r.record_type === type)
+  ).slice(0, 50);
+
   const el = document.getElementById("record-results");
   el.innerHTML = "";
-  if (data.items.length === 0) {
+  if (items.length === 0) {
     el.innerHTML = '<div class="search-result-empty">No records found</div>';
     return;
   }
-  data.items.forEach(r => {
+  items.forEach(r => {
     const row = document.createElement("div");
     row.className = "record-row";
     row.innerHTML = `<div><span class="record-type-badge">${r.record_type}</span><span class="fqdn">${r.fqdn}</span>
@@ -371,10 +419,10 @@ const runRecordSearch = debounce(async (q) => {
     });
     el.appendChild(row);
   });
-}, 250);
+}
 
-document.getElementById("record-search-input").addEventListener("input", (e) => runRecordSearch(e.target.value));
-recordTypeFilter.addEventListener("change", () => runRecordSearch(document.getElementById("record-search-input").value));
+document.getElementById("record-search-input").addEventListener("input", (e) => renderRecordResults(e.target.value));
+recordTypeFilter.addEventListener("change", () => renderRecordResults(document.getElementById("record-search-input").value));
 document.getElementById("record-search-back").addEventListener("click", () => showPanel("panel-action"));
 
 // ---- Step 3c: MODIFY edit ----
@@ -401,7 +449,7 @@ document.getElementById("modify-add").addEventListener("click", () => {
 
   state.items.push({
     action: "MODIFY", record_type: record.record_type, fqdn: record.fqdn, ttl, value,
-    source_record_id: record.id,
+    source_record_ref: record.ref,
     _display: { fqdn: record.fqdn, summary: Object.values(value).join(" ") },
   });
   toast("Added to request", "success");
@@ -428,7 +476,7 @@ document.getElementById("delete-add").addEventListener("click", () => {
   const record = state.selectedRecord;
   state.items.push({
     action: "DELETE", record_type: record.record_type, fqdn: record.fqdn, ttl: record.ttl, value: {},
-    source_record_id: record.id,
+    source_record_ref: record.ref,
     _display: { fqdn: record.fqdn, summary: "Delete existing " + record.record_type + " record" },
   });
   toast("Deletion added to request", "success");

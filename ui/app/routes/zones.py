@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from shared.auth.fastapi_deps import get_current_user
 from shared.database.session import get_session
+from shared.micetro.provider import MicetroProvider
 from shared.models.zones import DnsRecord, DnsZone
 
 router = APIRouter(prefix="/api/zones", tags=["zones"])
@@ -70,4 +71,29 @@ def search_zone_records(
         "total": total,
         "page": page,
         "page_size": page_size,
+    }
+
+
+@router.get("/{zone_id}/live-records")
+def live_zone_records(
+    zone_id: int,
+    db: Session = Depends(get_session),
+    _user=Depends(get_current_user),
+):
+    """Fetches every record in the zone directly from Micetro (bypasses the
+    Postgres inventory cache entirely) — used by the request wizard, which
+    must act on authoritative, not-possibly-stale data. Deliberately slower
+    than the cached /records endpoint; that's an accepted tradeoff here."""
+    zone = db.get(DnsZone, zone_id)
+    if zone is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Zone not found")
+
+    provider = MicetroProvider()
+    records = provider.list_all_records(zone.micetro_ref)
+    return {
+        "items": [
+            {"ref": r.ref, "fqdn": r.name, "record_type": r.record_type, "ttl": r.ttl, "value": r.data}
+            for r in records
+        ],
+        "total": len(records),
     }

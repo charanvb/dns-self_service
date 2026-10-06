@@ -9,9 +9,10 @@ class RequestItemIn(BaseModel):
     fqdn: str
     ttl: int | None = None
     value: dict = Field(default_factory=dict)
-    # For MODIFY/DELETE: the record id (from our inventory) the user selected,
-    # snapshotted at add-time so the Executor can detect drift before execution.
-    source_record_id: int | None = None
+    # For MODIFY/DELETE: the Micetro record ref the user selected from the
+    # live-fetched list — re-fetched live again at creation time, never
+    # trusted from the browser, to guarantee no stale/discrepant data is used.
+    source_record_ref: str | None = None
 
 
 class RequestItemOut(BaseModel):

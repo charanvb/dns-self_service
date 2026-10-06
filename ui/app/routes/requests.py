@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from shared.auth.fastapi_deps import CurrentUser, get_current_user
 from shared.database.session import get_session
+from shared.micetro.provider import MicetroProvider
 from shared.models.requests import DnsRequest, DnsRequestItem
-from shared.models.zones import DnsRecord, DnsZone
+from shared.models.zones import DnsZone
 from shared.validation.common import ValidationError, validate_fqdn, validate_ttl
 from shared.validation.registry import SUPPORTED_RECORD_TYPES, validate_record_value
 
@@ -31,6 +32,17 @@ def create_request(
     db.add(request_row)
     db.flush()  # assign request_row.id without committing yet
 
+    provider = MicetroProvider()
+    # Loaded lazily at most once per request-creation call (not per item) —
+    # needed for CREATE duplicate checks and as a fallback existence check.
+    live_zone_records_cache: list | None = None
+
+    def live_zone_records():
+        nonlocal live_zone_records_cache
+        if live_zone_records_cache is None:
+            live_zone_records_cache = provider.list_all_records(zone.micetro_ref)
+        return live_zone_records_cache
+
     item_rows: list[DnsRequestItem] = []
     try:
         for item in body.items:
@@ -45,19 +57,37 @@ def create_request(
 
             if item.action == "CREATE":
                 new_value = validate_record_value(item.record_type, item.value)
+                fqdn_clean = item.fqdn.rstrip(".").lower()
+                duplicate = next(
+                    (
+                        r for r in live_zone_records()
+                        if r.name.rstrip(".").lower() == fqdn_clean and r.record_type == item.record_type
+                    ),
+                    None,
+                )
+                if duplicate is not None:
+                    raise ValidationError(
+                        "fqdn",
+                        f"A {item.record_type} record already exists for '{item.fqdn}' in Micetro. "
+                        "Use a Modify request instead of Create.",
+                    )
             else:
-                # MODIFY / DELETE must reference a record we actually have in
-                # inventory — a fresh Micetro lookup happens later at execution
-                # time (Phase 9); this snapshot is only for the drift check.
-                if item.source_record_id is None:
-                    raise ValidationError("source_record_id", "Select an existing record to modify/delete")
-                source = db.get(DnsRecord, item.source_record_id)
-                if source is None or source.zone_id != zone.id:
-                    raise ValidationError("source_record_id", "Selected record not found in this zone")
+                # MODIFY / DELETE must reference a live Micetro record, fetched
+                # fresh here (not the Postgres cache) to avoid any discrepancy.
+                if not item.source_record_ref:
+                    raise ValidationError("source_record_ref", "Select an existing record to modify/delete")
+                try:
+                    source = provider.get_record(item.source_record_ref)
+                except Exception:
+                    raise ValidationError(
+                        "source_record_ref",
+                        "Could not find that record in Micetro — it may have changed. Please refresh and retry.",
+                    )
                 expected_current_value = {
+                    "ref": source.ref,
                     "record_type": source.record_type,
                     "ttl": source.ttl,
-                    "value": source.value,
+                    "value": source.data,
                 }
                 if item.action == "MODIFY":
                     new_value = validate_record_value(item.record_type, item.value)
