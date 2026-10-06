@@ -1,3 +1,37 @@
-# Ignore a file
+# Internal notes / API docs — never commit
 DNS_App_notes.txt
 swagger_JSON_for_micetro_QA.json
+
+# Secrets / local env
+.env
+*.env
+!.env.example
+*-key.json
+*service-account*.json
+*sa-key*.json
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node / UI
+node_modules/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+*.log
