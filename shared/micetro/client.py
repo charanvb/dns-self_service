@@ -21,18 +21,19 @@ class MicetroClient:
         self._session_token: str | None = None
 
     def _login(self) -> str:
+        # Not listed under "paths" in the swagger export — confirmed via the live
+        # Swagger UI "Try it out" that the real path has a "/micetro/" prefix.
         resp = requests.post(
-            f"{self.base_url}/sessions",
+            f"{self.base_url}/micetro/sessions",
             json={"loginName": self.username, "password": self.password},
             timeout=30,
         )
         resp.raise_for_status()
         body = resp.json()
-        # Response wrapper shape for POST /sessions isn't documented in the
-        # swagger export (path missing) — support both known conventions.
+        # Confirmed response shape: {"result": {"session": "..."}}.
         token = body.get("session") or body.get("result", {}).get("session")
         if not token:
-            raise MicetroAuthError(f"Unexpected /sessions response shape: {body!r}")
+            raise MicetroAuthError(f"Unexpected /micetro/sessions response shape: {body!r}")
         return token
 
     def _ensure_token(self) -> str:
