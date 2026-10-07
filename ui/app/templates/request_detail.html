@@ -49,6 +49,7 @@ async function load() {
           <span class="details-fqdn">${i.fqdn}</span>
         </div>
         <div class="details-fields">${kvs.join("")}</div>
+        ${i.error_message ? `<div class="error-banner">${i.error_message}</div>` : ""}
       </div>
       <span class="status-badge ${i.status}">${i.status}</span>
     </div>`;

@@ -52,7 +52,12 @@ class MicetroClient:
             token = self._ensure_token()
             headers["Authorization"] = f"Bearer {token}"
             resp = requests.request(method, f"{self.base_url}{path}", headers=headers, timeout=30, **kwargs)
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.exceptions.HTTPError as exc:
+            # Default message omits the response body, which is where Micetro
+            # actually explains the rejection (e.g. naming conflict details).
+            raise requests.exceptions.HTTPError(f"{exc} — response body: {resp.text[:1000]}", response=resp) from exc
         return resp
 
     def get(self, path: str, **kwargs) -> dict:

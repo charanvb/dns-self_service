@@ -499,6 +499,16 @@ h1.welcome {
 .btn-danger:hover { background: #9c2b1f; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .approval-actions { display: flex; gap: 10px; margin: 16px 0; }
+.error-banner {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fdecea;
+  color: var(--danger);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  word-break: break-word;
+}
 
 .btn-row {
   display: flex;
