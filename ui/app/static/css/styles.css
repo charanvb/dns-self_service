@@ -639,7 +639,8 @@ h1.welcome {
   border-radius: 999px;
   white-space: nowrap;
 }
-.status-badge.SUBMITTED, .status-badge.PENDING { background: #eef4ff; color: var(--brand-blue-dark); }
+.status-badge.SUBMITTED, .status-badge.PENDING, .status-badge.PENDING_APPROVAL { background: #eef4ff; color: var(--brand-blue-dark); }
+.status-badge.VALIDATED, .status-badge.APPROVED { background: #e6f2ea; color: #1a6b3c; }
 .status-badge.COMPLETED { background: #d9f2e3; color: var(--success); }
 .status-badge.FAILED, .status-badge.REJECTED { background: #fdecea; color: var(--danger); }
 .status-badge.PARTIAL_FAILURE { background: #fff3cd; color: #8a6d00; }

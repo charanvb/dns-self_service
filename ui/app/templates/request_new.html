@@ -593,7 +593,12 @@ document.getElementById("submit-request").addEventListener("click", async () => 
     });
     if (res.ok) {
       const data = await res.json();
-      toast("Request submitted!", "success");
+      if (data.status === "PENDING_APPROVAL") {
+        toast("Submitted — pending Zone Admin approval" + (data.policy_reasons.length
+          ? ": " + data.policy_reasons[0] : "."), "success");
+      } else {
+        toast("Request submitted!", "success");
+      }
       window.location.href = "/requests/" + data.id;
       return;
     }

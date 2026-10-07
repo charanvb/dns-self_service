@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 from shared.auth.fastapi_deps import CurrentUser, get_current_user
 from shared.database.session import get_session
 from shared.micetro.provider import MicetroProvider
+from shared.models.approvals import ApprovalRequest
 from shared.models.requests import DnsRequest, DnsRequestItem
 from shared.models.zones import DnsZone
+from shared.policy.engine import PolicyEngine
 from shared.policy.rate_limit import RateLimitExceeded, check_request_rate_limit
 from shared.validation.common import ValidationError, validate_fqdn, validate_ttl
 from shared.validation.registry import SUPPORTED_RECORD_TYPES, validate_record_value
@@ -200,6 +202,20 @@ def create_request(
         db.rollback()
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, {"field": exc.field, "message": exc.message})
 
+    policy_result = PolicyEngine(db).evaluate_request(zone, body.items)
+    if not policy_result.allowed:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            {"field": "policy", "message": " ".join(policy_result.reasons) or "Rejected by policy."},
+        )
+
+    if policy_result.requires_approval:
+        request_row.status = "PENDING_APPROVAL"
+        db.add(ApprovalRequest(request_id=request_row.id, zone_id=zone.id, status="PENDING"))
+    else:
+        request_row.status = "VALIDATED"
+
     db.add_all(item_rows)
     db.commit()
     db.refresh(request_row)
@@ -212,6 +228,7 @@ def create_request(
         status=request_row.status,
         justification=request_row.justification,
         items=[RequestItemOut.from_model(r) for r in item_rows],
+        policy_reasons=policy_result.reasons,
     )
 
 

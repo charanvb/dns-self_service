@@ -75,3 +75,6 @@ class RequestOut(BaseModel):
     status: str
     justification: str | None
     items: list[RequestItemOut]
+    # Only populated on the creation response (not persisted) — explains why
+    # the request landed in PENDING_APPROVAL / was rejected.
+    policy_reasons: list[str] = Field(default_factory=list)
