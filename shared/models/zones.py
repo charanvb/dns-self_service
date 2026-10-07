@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.database.base import Base
@@ -32,28 +32,6 @@ class ZoneAdmin(Base):
 
     zone: Mapped[DnsZone] = relationship()
 
-
-class DnsRecord(TimestampMixin, Base):
-    """Inventory cache of Micetro records — NOT authoritative, refreshed by sync job.
-
-    Always re-fetched from Micetro before MODIFY/DELETE execution; never used to
-    decide the outcome of a DNS change by itself.
-    """
-
-    __tablename__ = "dns_records"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    zone_id: Mapped[int] = mapped_column(ForeignKey("dns_zones.id", ondelete="CASCADE"), nullable=False)
-    micetro_ref: Mapped[str] = mapped_column(String(255), nullable=False)
-    fqdn: Mapped[str] = mapped_column(String(512), nullable=False)
-    record_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    ttl: Mapped[int] = mapped_column(Integer, nullable=False)
-    value: Mapped[str] = mapped_column(Text, nullable=False)
-    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    __table_args__ = (
-        Index("ix_dns_records_zone_id", "zone_id"),
-        Index("ix_dns_records_fqdn", "fqdn"),
-        Index("ix_dns_records_record_type", "record_type"),
-        UniqueConstraint("zone_id", "micetro_ref", name="uq_dns_records_zone_micetro_ref"),
-    )
+# Individual DNS records are never cached in Postgres — they must always be
+# read live from Micetro (see shared/micetro/provider.py), so there is no
+# DnsRecord model/table here.

@@ -4,7 +4,7 @@ from shared.models.execution import AuditLog, DnsSyncState, DnsZoneBackup, Execu
 from shared.models.policies import DnsPolicy, PolicyRule
 from shared.models.requests import DnsRequest, DnsRequestItem
 from shared.models.system import SystemConfig
-from shared.models.zones import DnsRecord, DnsZone, ZoneAdmin
+from shared.models.zones import DnsZone, ZoneAdmin
 
 __all__ = [
     "ApprovalAction",
@@ -21,7 +21,6 @@ __all__ = [
     "DnsRequest",
     "DnsRequestItem",
     "SystemConfig",
-    "DnsRecord",
     "DnsZone",
     "ZoneAdmin",
 ]

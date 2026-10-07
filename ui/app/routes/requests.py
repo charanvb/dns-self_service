@@ -10,7 +10,7 @@ from shared.models.zones import DnsZone
 from shared.validation.common import ValidationError, validate_fqdn, validate_ttl
 from shared.validation.registry import SUPPORTED_RECORD_TYPES, validate_record_value
 
-from ui.app.schemas_requests import CreateRequestIn, RequestItemOut, RequestOut
+from ui.app.schemas import CreateRequestIn, RequestItemOut, RequestOut
 
 import logging
 
