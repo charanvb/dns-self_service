@@ -368,6 +368,18 @@ function checkCreateDuplicate(fqdn) {
     warnEl.textContent = `A ${state.selectedCreateType} record already exists for '${fqdn}' (value: ${dup.value}). Use Modify instead of Create.`;
     warnEl.style.display = "block";
     addBtn.disabled = true;
+    return;
+  }
+
+  // Also check items already queued in THIS request — the Micetro check above
+  // only catches records that already exist, not two new items both creating
+  // the same name+type in one go.
+  const queuedDup = state.items.find(i =>
+    i.action === "CREATE" && i.fqdn.replace(/\.$/, "").toLowerCase() === fqdnClean && i.record_type === state.selectedCreateType);
+  if (queuedDup) {
+    warnEl.textContent = `You've already added a CREATE for a ${state.selectedCreateType} record at '${fqdn}' in this request.`;
+    warnEl.style.display = "block";
+    addBtn.disabled = true;
   } else {
     warnEl.style.display = "none";
     addBtn.disabled = false;

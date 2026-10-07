@@ -58,6 +58,11 @@ def create_request(
         return live_zone_records_cache
 
     item_rows: list[DnsRequestItem] = []
+    # Tracks (fqdn, record_type) pairs already queued for CREATE earlier in
+    # THIS SAME request — the live-Micetro duplicate check below only catches
+    # records that already exist in Micetro, not two new items in one request
+    # both trying to create the same name+type.
+    create_keys_seen: set[tuple[str, str]] = set()
     try:
         for item in body.items:
             if item.record_type not in SUPPORTED_RECORD_TYPES:
@@ -90,6 +95,15 @@ def create_request(
 
             if item.action == "CREATE":
                 new_value = validate_record_value(item.record_type, item.value)
+
+                create_key = (fqdn_clean, item.record_type)
+                if create_key in create_keys_seen:
+                    raise ValidationError(
+                        "fqdn",
+                        f"This request already has another CREATE for a {item.record_type} record at "
+                        f"'{fqdn_raw}'. Combine them into one change.",
+                    )
+
                 records = live_zone_records()
                 logger.info(
                     "duplicate-check zone=%s fqdn_clean=%r type=%s live_record_count=%d sample=%r",
@@ -110,6 +124,7 @@ def create_request(
                         f"A {item.record_type} record already exists for '{fqdn_raw}' in Micetro. "
                         "Use a Modify request instead of Create.",
                     )
+                create_keys_seen.add(create_key)
 
                 # SPF-specific rule (independent of the exact type+name duplicate
                 # check above): only one SPF record is allowed per name, even if
