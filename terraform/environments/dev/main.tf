@@ -75,15 +75,16 @@ module "ui_service" {
   vpc_egress             = "ALL_TRAFFIC" # UI now calls Micetro live (request wizard) — same reachability fix as inventory-sync
   env_vars = [
     { name = "MICETRO_API_URL", value = "https://ssportal-qa.unilever.com/mmws/api/v2" },
-    { name = "APP_CALLBACK_BASE_URL", value = var.app_callback_base_url },
   ]
   secret_env_vars = [
     { name = "DATABASE_URL", secret_id = "db-connection-string" },
     { name = "APP_AUTH_SIGNING_KEY", secret_id = "app-auth-signing-key" },
     { name = "MICETRO_API_USERNAME", secret_id = "micetro-api-username" },
     { name = "MICETRO_API_PASSWORD", secret_id = "micetro-api-password" },
-    { name = "AZURE_AUTOMATION_BACKUP_WEBHOOK_URL", secret_id = "azure-automation-backup-webhook-url" },
-    { name = "AZURE_AUTOMATION_BACKUP_CALLBACK_SECRET", secret_id = "azure-automation-backup-callback-secret" },
+    # AZURE_AUTOMATION_BACKUP_WEBHOOK_URL / _CALLBACK_SECRET deliberately NOT wired yet — those
+    # secret containers have no version uploaded, which blocks Cloud Run from even starting a
+    # revision. Re-add once the backup integration (deferred) is picked back up. The Executor
+    # already fails safely (BACKUP_FAILED, no DNS write attempted) if these env vars are absent.
   ]
 
   depends_on = [module.secret_manager]
