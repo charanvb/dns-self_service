@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Pending Approvals — DNS Self-Service{% endblock %}
+{% block body %}
+<div class="topbar">
+  <div class="brand"><span class="logo-dot"></span> DNS Self-Service</div>
+  <div class="user-menu">
+    <span>{{ username }}</span>
+    <button id="logout-btn">Logout</button>
+  </div>
+</div>
+
+<div class="page">
+  <a class="back-link" href="/dashboard">&larr; Back to dashboard</a>
+  <h1 class="welcome">Pending Approvals</h1>
+  <div id="content"></div>
+</div>
+
+<script>
+async function load() {
+  const res = await fetch("/api/approvals");
+  const el = document.getElementById("content");
+  if (!res.ok) {
+    el.innerHTML = `<div class="empty-state">Could not load pending approvals.</div>`;
+    return;
+  }
+  const items = await res.json();
+  if (items.length === 0) {
+    el.innerHTML = `<div class="empty-state">No requests waiting for approval right now.</div>`;
+    return;
+  }
+  const rows = items.map(a => `
+    <tr>
+      <td><a href="/requests/${a.request_id}">#${a.request_id}</a></td>
+      <td>${a.zone_name}</td>
+      <td>${a.requestor}</td>
+      <td>${a.justification || ""}</td>
+      <td>${new Date(a.created_at).toLocaleString()}</td>
+      <td><a class="card-link" href="/requests/${a.request_id}">Review →</a></td>
+    </tr>`).join("");
+  el.innerHTML = `<table class="requests-table">
+    <thead><tr><th>Request</th><th>Zone</th><th>Requestor</th><th>Justification</th><th>Submitted</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  await fetch("/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+});
+load();
+</script>
+{% endblock %}

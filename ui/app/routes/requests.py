@@ -7,7 +7,7 @@ from shared.database.session import get_session
 from shared.micetro.provider import MicetroProvider
 from shared.models.approvals import ApprovalRequest
 from shared.models.requests import DnsRequest, DnsRequestItem
-from shared.models.zones import DnsZone
+from shared.models.zones import DnsZone, ZoneAdmin
 from shared.policy.engine import PolicyEngine
 from shared.policy.rate_limit import RateLimitExceeded, check_request_rate_limit
 from shared.validation.common import ValidationError, validate_fqdn, validate_ttl
@@ -263,8 +263,26 @@ def get_request(
     request_row = db.get(DnsRequest, request_id)
     if request_row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Request not found")
-    if request_row.requestor_id != user.user_id and not user.has_role("CLOUDOPS_ADMIN"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your request")
+
+    is_owner = request_row.requestor_id == user.user_id
+    is_cloudops = user.has_role("CLOUDOPS_ADMIN")
+    is_zone_admin = user.has_role("ZONE_ADMIN") and db.execute(
+        select(ZoneAdmin.id).where(
+            ZoneAdmin.zone_id == request_row.zone_id, ZoneAdmin.user_id == user.user_id
+        )
+    ).first() is not None
+    if not (is_owner or is_cloudops or is_zone_admin):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized to view this request")
+
+    latest_approval = (
+        db.execute(
+            select(ApprovalRequest)
+            .where(ApprovalRequest.request_id == request_id)
+            .order_by(ApprovalRequest.id.desc())
+        )
+        .scalars()
+        .first()
+    )
 
     return RequestOut(
         id=request_row.id,
@@ -272,4 +290,6 @@ def get_request(
         status=request_row.status,
         justification=request_row.justification,
         items=[RequestItemOut.from_model(r) for r in request_row.items],
+        approval_request_id=latest_approval.id if latest_approval else None,
+        approval_status=latest_approval.status if latest_approval else None,
     )

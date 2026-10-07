@@ -32,12 +32,12 @@
     </div>
 
     {% if "ZONE_ADMIN" in roles or "CLOUDOPS_ADMIN" in roles %}
-    <div class="card disabled">
+    <div class="card">
       <div class="card-banner" style="background:#fff7ed;">✅</div>
       <div class="card-body">
-        <div class="card-title">Pending Approvals <span class="badge">Coming soon</span></div>
+        <div class="card-title">Pending Approvals</div>
         <div class="card-desc">Review and approve requests for zones you administer.</div>
-        <a class="card-link" href="#">Go</a>
+        <a class="card-link" href="/approvals">Go →</a>
       </div>
     </div>
     {% endif %}

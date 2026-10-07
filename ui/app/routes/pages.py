@@ -68,5 +68,16 @@ def request_detail_page(request: Request, request_id: int):
     if not payload:
         return RedirectResponse("/login")
     return templates.TemplateResponse(
-        "request_detail.html", {"request": request, "username": payload["username"], "request_id": request_id}
+        "request_detail.html",
+        {"request": request, "username": payload["username"], "roles": payload["roles"], "request_id": request_id},
     )
+
+
+@router.get("/approvals", response_class=HTMLResponse)
+def approvals_page(request: Request):
+    payload = get_current_user_for_page(request)
+    if not payload:
+        return RedirectResponse("/login")
+    if "ZONE_ADMIN" not in payload["roles"] and "CLOUDOPS_ADMIN" not in payload["roles"]:
+        return RedirectResponse("/dashboard")
+    return templates.TemplateResponse("approvals_list.html", {"request": request, "username": payload["username"]})

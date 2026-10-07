@@ -498,6 +498,7 @@ h1.welcome {
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-danger:hover { background: #9c2b1f; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.approval-actions { display: flex; gap: 10px; margin: 16px 0; }
 
 .btn-row {
   display: flex;

@@ -25,6 +25,9 @@ async function load() {
     return;
   }
   const r = await res.json();
+  const myRoles = {{ roles | tojson }};
+  const canDecide = r.approval_status === "PENDING"
+    && (myRoles.includes("ZONE_ADMIN") || myRoles.includes("CLOUDOPS_ADMIN"));
   const rows = r.items.map(i => {
     const kvs = [`<span class="kv"><b>TTL</b> <span class="val">${i.ttl ?? ""}</span></span>`];
     if (i.action === "DELETE") {
@@ -54,9 +57,31 @@ async function load() {
     <div class="panel">
       <p><span class="status-badge ${r.status}">${r.status.replace("_"," ")}</span></p>
       ${r.justification ? `<p class="hint">${r.justification}</p>` : ""}
+      ${canDecide ? `
+      <div class="approval-actions">
+        <button id="approve-btn" class="btn btn-primary">Approve</button>
+        <button id="reject-btn" class="btn btn-secondary">Reject</button>
+      </div>` : ""}
       <h2>Changes</h2>
       ${rows}
     </div>`;
+
+  if (canDecide) {
+    document.getElementById("approve-btn").addEventListener("click", async () => {
+      if (!confirm("Approve this request?")) return;
+      await fetch(`/api/approvals/${r.approval_request_id}/approve`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
+      });
+      load();
+    });
+    document.getElementById("reject-btn").addEventListener("click", async () => {
+      const reason = prompt("Reason for rejection (optional):") || "";
+      await fetch(`/api/approvals/${r.approval_request_id}/reject`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }),
+      });
+      load();
+    });
+  }
 }
 document.getElementById("logout-btn").addEventListener("click", async () => {
   await fetch("/auth/logout", { method: "POST" });

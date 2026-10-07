@@ -78,3 +78,5 @@ class RequestOut(BaseModel):
     # Only populated on the creation response (not persisted) — explains why
     # the request landed in PENDING_APPROVAL / was rejected.
     policy_reasons: list[str] = Field(default_factory=list)
+    approval_request_id: int | None = None
+    approval_status: str | None = None

@@ -20,6 +20,22 @@ def _to_fqdn(record_name: str, zone_name: str) -> str:
     return f"{record_clean}.{zone_name}"
 
 
+def _to_relative_name(fqdn: str, zone_name: str) -> str:
+    """Inverse of _to_fqdn, needed to build the "name" field Micetro expects
+    on writes. Apex representation as "@" follows common DDI-tool convention
+    but is NOT empirically confirmed against a live Micetro write — verify
+    before relying on this for an apex CREATE (currently only TXT records are
+    allowed at the apex per validation rules)."""
+    zone_clean = zone_name.rstrip(".")
+    fqdn_clean = fqdn.rstrip(".")
+    if fqdn_clean.lower() == zone_clean.lower():
+        return "@"
+    suffix = "." + zone_clean
+    if fqdn_clean.lower().endswith(suffix.lower()):
+        return fqdn_clean[: -len(suffix)]
+    raise ValueError(f"FQDN '{fqdn}' is not within zone '{zone_name}'")
+
+
 class MicetroProvider(DNSProvider):
     def __init__(self, client: MicetroClient | None = None):
         self.client = client or MicetroClient()
@@ -97,10 +113,32 @@ class MicetroProvider(DNSProvider):
         )
 
     def create_record(self, zone_ref: str, record: RecordDTO) -> str:
-        raise NotImplementedError("Implemented in Phase 8 (Executor)")
+        """record.data must already be wire-encoded (see shared.micetro.encoding)
+        and record.name a full FQDN — this method handles the FQDN->relative-name
+        conversion Micetro requires on writes."""
+        zone_name = self._zone_name(zone_ref)
+        relative_name = _to_relative_name(record.name, zone_name)
+        body = {
+            "dnsRecord": {
+                "name": relative_name,
+                "type": record.record_type,
+                "ttl": str(record.ttl),
+                "data": record.data,
+            }
+        }
+        resp = self.client.post(f"/dnsZones/{zone_ref}/dnsRecords", json=body)
+        created = resp.json()
+        # Confirmed 201 response is {"ref": "..."} per swagger, but every other
+        # endpoint turned out to be wrapped in {"result": {...}} too — handle both.
+        ref = created.get("ref") or created.get("result", {}).get("ref")
+        if not ref:
+            raise RuntimeError(f"Unexpected create-record response shape: {created!r}")
+        return ref
 
     def modify_record(self, record_ref: str, properties: dict) -> None:
-        raise NotImplementedError("Implemented in Phase 8 (Executor)")
+        """properties keys match DNSRecord field names (e.g. data, ttl) — see
+        shared.micetro.encoding.encode() to build the 'data' value."""
+        self.client.put(f"/dnsRecords/{record_ref}", json={"properties": properties})
 
     def delete_record(self, record_ref: str) -> None:
-        raise NotImplementedError("Implemented in Phase 8 (Executor)")
+        self.client.delete(f"/dnsRecords/{record_ref}")
