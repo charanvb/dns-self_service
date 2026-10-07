@@ -41,6 +41,8 @@ class RequestItemOut(BaseModel):
     ttl: int | None
     status: str
     error_message: str | None
+    value: dict | None = None
+    previous_value: str | None = None
 
     @classmethod
     def from_model(cls, item: DnsRequestItem) -> "RequestItemOut":
@@ -52,6 +54,8 @@ class RequestItemOut(BaseModel):
             ttl=item.ttl,
             status=item.status,
             error_message=item.error_message,
+            value=item.new_value,
+            previous_value=(item.expected_current_value or {}).get("value"),
         )
 
 

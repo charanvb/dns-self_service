@@ -165,16 +165,8 @@
   </div>
 </div>
 
+<script src="/static/js/record-types.js"></script>
 <script>
-const FIELD_DEFS = {
-  A: [{name:"ipv4", label:"IPv4 Address", placeholder:"10.10.10.10"}],
-  AAAA: [{name:"ipv6", label:"IPv6 Address", placeholder:"2001:db8::1"}],
-  CNAME: [{name:"target", label:"Target (FQDN)", placeholder:"backend.example.com"}],
-  TXT: [{name:"text", label:"TXT Value", placeholder:'"v=spf1 include:example.com -all"', textarea:true}],
-  MX: [{name:"priority", label:"Priority", placeholder:"10"}, {name:"target", label:"Mail Server (FQDN)", placeholder:"mail.example.com"}],
-};
-const RECORD_TYPES = Object.keys(FIELD_DEFS);
-
 const state = { zone: null, action: null, items: [], recordSearchMode: null, selectedRecord: null, selectedCreateType: "A", liveRecords: null, liveRecordsLoading: false };
 
 function showPanel(id) {
@@ -308,6 +300,7 @@ function renderTypeChips() {
   RECORD_TYPES.forEach(t => {
     const chip = document.createElement("div");
     chip.className = "type-chip" + (t === state.selectedCreateType ? " selected" : "");
+    chip.dataset.type = t;
     chip.textContent = t;
     chip.addEventListener("click", () => {
       state.selectedCreateType = t;
@@ -334,7 +327,8 @@ function renderDynamicFields(containerId, recordType) {
 }
 
 function updateFqdnPreview() {
-  const label = document.getElementById("create-label").value.trim();
+  let label = document.getElementById("create-label").value.trim();
+  if (label === "@") label = ""; // "@" is the DNS zone-file alias for the apex, not a literal label
   const zoneName = state.zone ? state.zone.zone_name : "your-zone.com";
   const fqdn = label ? `${label}.${zoneName}` : zoneName;
   document.getElementById("fqdn-preview-text").innerHTML =
@@ -357,6 +351,17 @@ function checkCreateDuplicate(fqdn) {
     return;
   }
   const fqdnClean = fqdn.replace(/\.$/, "").toLowerCase();
+
+  // Apex is blocked for every type except TXT (SPF/DMARC/verification records
+  // legitimately live at the apex) — mirrors the backend rule.
+  const zoneApexClean = state.zone.zone_name.replace(/\.$/, "").toLowerCase();
+  if (fqdnClean === zoneApexClean && state.selectedCreateType !== "TXT") {
+    warnEl.textContent = "Changes to the zone apex are not allowed via self-service (TXT is the only exception).";
+    warnEl.style.display = "block";
+    addBtn.disabled = true;
+    return;
+  }
+
   const dup = state.liveRecords.find(r =>
     r.fqdn.replace(/\.$/, "").toLowerCase() === fqdnClean && r.record_type === state.selectedCreateType);
   if (dup) {
@@ -386,7 +391,6 @@ document.getElementById("create-add").addEventListener("click", () => {
 
   state.items.push({
     action: "CREATE", record_type: state.selectedCreateType, fqdn, ttl, value,
-    _display: { fqdn, summary: Object.values(value).join(" ") },
   });
   toast("Added to request", "success");
   renderReview();
@@ -430,8 +434,12 @@ function renderRecordResults(q) {
   items.forEach(r => {
     const row = document.createElement("div");
     row.className = "record-row";
-    row.innerHTML = `<div><span class="record-type-badge">${r.record_type}</span><span class="fqdn">${r.fqdn}</span>
-      <div class="meta">TTL ${r.ttl} &middot; ${r.value}</div></div>`;
+    row.innerHTML = `
+      <span class="record-type-badge" data-type="${r.record_type}">${r.record_type}</span>
+      <div class="record-main">
+        <div class="fqdn">${r.fqdn}</div>
+        <div class="meta">TTL <span class="value">${r.ttl}</span> &middot; <span class="value">${r.value}</span></div>
+      </div>`;
     row.addEventListener("click", () => {
       state.selectedRecord = r;
       if (state.recordSearchMode === "MODIFY") startModifyEdit(r); else startDeleteConfirm(r);
@@ -447,7 +455,7 @@ document.getElementById("record-search-back").addEventListener("click", () => sh
 // ---- Step 3c: MODIFY edit ----
 function startModifyEdit(record) {
   document.getElementById("modify-fqdn").innerHTML =
-    `<span class="record-type-badge">${record.record_type}</span>${record.fqdn}`;
+    `<span class="record-type-badge" data-type="${record.record_type}">${record.record_type}</span> ${record.fqdn}`;
   document.getElementById("modify-ttl").value = record.ttl;
   renderDynamicFields("modify-dynamic-fields", record.record_type);
   showPanel("panel-modify-edit");
@@ -469,7 +477,7 @@ document.getElementById("modify-add").addEventListener("click", () => {
   state.items.push({
     action: "MODIFY", record_type: record.record_type, fqdn: record.fqdn, ttl, value,
     source_record_ref: record.ref,
-    _display: { fqdn: record.fqdn, summary: Object.values(value).join(" ") },
+    _display: { previousValue: record.value },
   });
   toast("Added to request", "success");
   renderReview();
@@ -479,7 +487,8 @@ document.getElementById("modify-add").addEventListener("click", () => {
 // ---- Step 3d: DELETE confirm ----
 function startDeleteConfirm(record) {
   document.getElementById("delete-fqdn").innerHTML =
-    `<span class="record-type-badge">${record.record_type}</span>${record.fqdn} &middot; TTL ${record.ttl} &middot; ${record.value}`;
+    `<span class="record-type-badge" data-type="${record.record_type}">${record.record_type}</span> ${record.fqdn}
+     <div class="meta" style="margin-top:6px;">TTL <span class="value">${record.ttl}</span> &middot; <span class="value">${record.value}</span></div>`;
   document.getElementById("delete-confirm-input").value = "";
   document.getElementById("delete-confirm-error").textContent = "";
   document.getElementById("delete-add").disabled = true;
@@ -496,7 +505,7 @@ document.getElementById("delete-add").addEventListener("click", () => {
   state.items.push({
     action: "DELETE", record_type: record.record_type, fqdn: record.fqdn, ttl: record.ttl, value: {},
     source_record_ref: record.ref,
-    _display: { fqdn: record.fqdn, summary: "Delete existing " + record.record_type + " record" },
+    _display: { previousValue: record.value },
   });
   toast("Deletion added to request", "success");
   renderReview();
@@ -512,10 +521,28 @@ function renderReview() {
   state.items.forEach((item, idx) => {
     const row = document.createElement("div");
     row.className = "review-item";
-    row.innerHTML = `<div class="details">
-        <span class="action-badge ${item.action.toLowerCase()}">${item.action}</span>
-        <span class="record-type-badge">${item.record_type}</span>
-        <strong>${item._display.fqdn}</strong> &mdash; ${item._display.summary}
+
+    const kvs = [];
+    kvs.push(`<span class="kv"><b>TTL</b> <span class="val">${item.ttl}</span></span>`);
+    if (item.action === "DELETE") {
+      kvs.push(`<span class="kv"><b>Current value</b> <span class="val">${item._display.previousValue}</span></span>`);
+    } else {
+      Object.entries(item.value || {}).forEach(([k, v]) => {
+        kvs.push(`<span class="kv"><b>${fieldLabel(item.record_type, k)}</b> <span class="val">${v}</span></span>`);
+      });
+      if (item.action === "MODIFY" && item._display && item._display.previousValue) {
+        kvs.push(`<span class="kv"><b>Was</b> <span class="val">${item._display.previousValue}</span></span>`);
+      }
+    }
+
+    row.innerHTML = `
+      <div class="details">
+        <div class="details-head">
+          <span class="action-badge ${item.action.toLowerCase()}">${item.action}</span>
+          <span class="record-type-badge" data-type="${item.record_type}">${item.record_type}</span>
+          <span class="details-fqdn">${item.fqdn}</span>
+        </div>
+        <div class="details-fields">${kvs.join("")}</div>
       </div>`;
     const removeBtn = document.createElement("button");
     removeBtn.className = "remove-btn";

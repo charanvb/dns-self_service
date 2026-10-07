@@ -1,13 +1,27 @@
 :root {
   --brand-blue: #0a5ad6;
   --brand-blue-dark: #07409c;
-  --bg: #f4f6f9;
+  --bg: #f6f8fa;
   --card-bg: #ffffff;
-  --text: #1c1f26;
-  --text-muted: #6b7280;
-  --border: #e4e7ec;
+  --text: #1b1f24;
+  --text-muted: #636c76;
+  --border: #d8dee4;
   --danger: #c0392b;
-  --radius: 10px;
+  --success: #1a7f45;
+  --radius: 8px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  /* Per-record-type accent colors — used consistently for badges/chips
+     everywhere a record type appears, so the eye learns to scan by color. */
+  --type-a: #0a5ad6;
+  --type-a-bg: #eef4ff;
+  --type-aaaa: #6b3fd6;
+  --type-aaaa-bg: #f2eeff;
+  --type-cname: #0d8a7a;
+  --type-cname-bg: #e6f7f4;
+  --type-txt: #a6650f;
+  --type-txt-bg: #fdf3e3;
+  --type-mx: #c0397e;
+  --type-mx-bg: #fdeef6;
 }
 
 * {
@@ -16,9 +30,10 @@
 
 body {
   margin: 0;
-  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
+  line-height: 1.5;
 }
 
 .topbar {
@@ -422,12 +437,18 @@ h1.welcome {
   border-color: var(--brand-blue);
   color: #fff;
 }
+.type-chip.selected[data-type="A"] { background: var(--type-a); border-color: var(--type-a); }
+.type-chip.selected[data-type="AAAA"] { background: var(--type-aaaa); border-color: var(--type-aaaa); }
+.type-chip.selected[data-type="CNAME"] { background: var(--type-cname); border-color: var(--type-cname); }
+.type-chip.selected[data-type="TXT"] { background: var(--type-txt); border-color: var(--type-txt); }
+.type-chip.selected[data-type="MX"] { background: var(--type-mx); border-color: var(--type-mx); }
 
 .fqdn-preview {
-  background: #f4f6f9;
-  border-radius: 8px;
+  background: #f6f8fa;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 12px 14px;
-  font-family: "Consolas", monospace;
+  font-family: var(--mono);
   font-size: 0.95rem;
   margin-bottom: 16px;
   word-break: break-all;
@@ -486,30 +507,53 @@ h1.welcome {
 
 /* Record search / delete confirm */
 .record-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
+  gap: 14px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   margin-bottom: 8px;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
-.record-row:hover { border-color: var(--brand-blue); }
-.record-row.selected { border-color: var(--brand-blue); background: #eef4ff; }
-.record-row .fqdn { font-weight: 600; }
-.record-row .meta { color: var(--text-muted); font-size: 0.82rem; }
+.record-row:hover { border-color: var(--brand-blue); background: #f8fafd; }
+.record-row.selected { border-color: var(--brand-blue); background: var(--type-a-bg); }
+.record-row .record-main { min-width: 0; }
+.record-row .fqdn {
+  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+.record-row .meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+.record-row .meta .value {
+  font-family: var(--mono);
+  color: var(--text);
+}
 .record-type-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.7rem;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
   background: #eef0f4;
   color: var(--text-muted);
-  margin-right: 8px;
+  white-space: nowrap;
 }
+.record-type-badge[data-type="A"] { background: var(--type-a-bg); color: var(--type-a); }
+.record-type-badge[data-type="AAAA"] { background: var(--type-aaaa-bg); color: var(--type-aaaa); }
+.record-type-badge[data-type="CNAME"] { background: var(--type-cname-bg); color: var(--type-cname); }
+.record-type-badge[data-type="TXT"] { background: var(--type-txt-bg); color: var(--type-txt); }
+.record-type-badge[data-type="MX"] { background: var(--type-mx-bg); color: var(--type-mx); }
 
 .confirm-box {
   background: #fdecea;
@@ -529,29 +573,62 @@ h1.welcome {
 /* Review list */
 .review-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 12px 16px;
+  gap: 12px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   margin-bottom: 8px;
 }
-.review-item .details { font-size: 0.88rem; }
+.review-item .details { flex: 1; min-width: 0; }
+.review-item .details-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.review-item .details-fqdn {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+.review-item .details-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.review-item .details-fields .kv b {
+  color: var(--text);
+  font-weight: 600;
+}
+.review-item .details-fields .kv .val {
+  font-family: var(--mono);
+}
 .review-item .remove-btn {
   background: none;
   border: none;
   color: var(--danger);
   cursor: pointer;
   font-size: 0.85rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .action-badge {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.7rem;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-right: 8px;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
-.action-badge.create { background: #d9f2e3; color: #1a7f45; }
+.action-badge.create { background: #d9f2e3; color: var(--success); }
 .action-badge.modify { background: #fff3cd; color: #8a6d00; }
 .action-badge.delete { background: #fdecea; color: var(--danger); }
 
@@ -560,9 +637,10 @@ h1.welcome {
   font-weight: 700;
   padding: 3px 10px;
   border-radius: 999px;
+  white-space: nowrap;
 }
 .status-badge.SUBMITTED, .status-badge.PENDING { background: #eef4ff; color: var(--brand-blue-dark); }
-.status-badge.COMPLETED { background: #d9f2e3; color: #1a7f45; }
+.status-badge.COMPLETED { background: #d9f2e3; color: var(--success); }
 .status-badge.FAILED, .status-badge.REJECTED { background: #fdecea; color: var(--danger); }
 .status-badge.PARTIAL_FAILURE { background: #fff3cd; color: #8a6d00; }
 

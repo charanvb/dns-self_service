@@ -15,6 +15,7 @@
   <div id="content"></div>
 </div>
 
+<script src="/static/js/record-types.js"></script>
 <script>
 async function load() {
   const res = await fetch("/api/requests/{{ request_id }}");
@@ -24,15 +25,31 @@ async function load() {
     return;
   }
   const r = await res.json();
-  const rows = r.items.map(i => `
+  const rows = r.items.map(i => {
+    const kvs = [`<span class="kv"><b>TTL</b> <span class="val">${i.ttl ?? ""}</span></span>`];
+    if (i.action === "DELETE") {
+      kvs.push(`<span class="kv"><b>Value</b> <span class="val">${i.previous_value ?? ""}</span></span>`);
+    } else {
+      Object.entries(i.value || {}).forEach(([k, v]) => {
+        kvs.push(`<span class="kv"><b>${fieldLabel(i.record_type, k)}</b> <span class="val">${v}</span></span>`);
+      });
+      if (i.action === "MODIFY" && i.previous_value) {
+        kvs.push(`<span class="kv"><b>Was</b> <span class="val">${i.previous_value}</span></span>`);
+      }
+    }
+    return `
     <div class="review-item">
       <div class="details">
-        <span class="action-badge ${i.action.toLowerCase()}">${i.action}</span>
-        <span class="record-type-badge">${i.record_type}</span>
-        <strong>${i.fqdn}</strong> &mdash; TTL ${i.ttl ?? ""}
+        <div class="details-head">
+          <span class="action-badge ${i.action.toLowerCase()}">${i.action}</span>
+          <span class="record-type-badge" data-type="${i.record_type}">${i.record_type}</span>
+          <span class="details-fqdn">${i.fqdn}</span>
+        </div>
+        <div class="details-fields">${kvs.join("")}</div>
       </div>
       <span class="status-badge ${i.status}">${i.status}</span>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   el.innerHTML = `
     <div class="panel">
       <p><span class="status-badge ${r.status}">${r.status.replace("_"," ")}</span></p>

@@ -63,17 +63,26 @@ def create_request(
             if item.record_type not in SUPPORTED_RECORD_TYPES:
                 raise ValidationError("record_type", f"Unsupported record type: {item.record_type}")
 
-            validate_fqdn(item.fqdn, zone.zone_name)
+            # "@" is the conventional DNS zone-file alias for the apex — treat
+            # it exactly as if the user left the label blank, not as a literal
+            # (invalid) label.
+            fqdn_raw = item.fqdn.strip()
+            if fqdn_raw.split(".")[0] == "@":
+                fqdn_raw = zone.zone_name
+
+            validate_fqdn(fqdn_raw, zone.zone_name)
             ttl = validate_ttl(item.ttl if item.ttl is not None else DEFAULT_TTL)
 
-            # Zone apex (@) holds critical NS/SOA/root records — never allow
-            # self-service changes there, regardless of action.
-            fqdn_clean = item.fqdn.rstrip(".").lower()
-            if fqdn_clean == zone.zone_name.rstrip(".").lower():
+            # Zone apex holds critical NS/SOA/root records — block self-service
+            # changes there for every action EXCEPT TXT (SPF/DMARC/domain-
+            # verification records legitimately live at the apex).
+            fqdn_clean = fqdn_raw.rstrip(".").lower()
+            is_apex = fqdn_clean == zone.zone_name.rstrip(".").lower()
+            if is_apex and item.record_type != "TXT":
                 raise ValidationError(
                     "fqdn",
-                    "Changes to the zone apex record are not allowed via self-service. "
-                    "Contact your DNS/CloudOps team directly for apex changes.",
+                    "Changes to the zone apex record are not allowed via self-service "
+                    "(TXT records are the only exception). Contact your DNS/CloudOps team directly.",
                 )
 
             expected_current_value = None
@@ -98,7 +107,7 @@ def create_request(
                 if duplicate is not None:
                     raise ValidationError(
                         "fqdn",
-                        f"A {item.record_type} record already exists for '{item.fqdn}' in Micetro. "
+                        f"A {item.record_type} record already exists for '{fqdn_raw}' in Micetro. "
                         "Use a Modify request instead of Create.",
                     )
 
@@ -115,7 +124,7 @@ def create_request(
                     if spf_exists:
                         raise ValidationError(
                             "value",
-                            f"An SPF record already exists for '{item.fqdn}'. Only one SPF record is "
+                            f"An SPF record already exists for '{fqdn_raw}'. Only one SPF record is "
                             "allowed per name — use a Modify request to change it instead.",
                         )
             else:
@@ -144,7 +153,7 @@ def create_request(
                     request_id=request_row.id,
                     action=item.action,
                     record_type=item.record_type,
-                    fqdn=item.fqdn.rstrip("."),
+                    fqdn=fqdn_raw.rstrip("."),
                     ttl=ttl,
                     new_value=new_value,
                     expected_current_value=expected_current_value,
