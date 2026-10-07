@@ -15,6 +15,18 @@ Runtime config is injected via environment variables; secret values are mounted/
 | `azure-automation-backup-callback-secret` | HMAC key used to verify the runbook's completion callback |
 | `app-auth-signing-key` | Signing key for local/test auth session tokens (pre-CIH) |
 
+## Non-secret config
+
+| Variable | Purpose |
+|---|---|
+| `APP_CALLBACK_BASE_URL` | Public base URL of the ui service, used to build the Azure Automation backup callback URL (`{base}/internal/backups/{correlationId}/complete`). Set once the Cloud Run URL is known (`terraform/environments/dev/variables.tf` `app_callback_base_url`). |
+
+**Known open issue (Phase 9 Executor):** `/internal/backups/{correlationId}/complete` is authenticated via
+HMAC only (no session cookie), meant to be called by the Azure Automation runbook — but the ui service is
+currently behind IAP, which will reject the Azure-originated call before it reaches the app. This needs an
+infra decision (e.g. a separate, non-IAP-fronted ingress path for just this endpoint) before the backup
+callback can work end-to-end; not yet resolved.
+
 ## Local test users (Phase 3 — local auth only, replaced by CIH/SSO later)
 
 Seeded by migration `0002_add_local_test_users`. All 6 share the same test password `Test@12345`.

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from shared.auth.fastapi_deps import CurrentUser, require_roles
 from shared.database.session import get_session
+from shared.executor.engine import trigger_execution
 from shared.models.approvals import ApprovalAction, ApprovalRequest
 from shared.models.auth import User
 from shared.models.requests import DnsRequest
@@ -80,11 +81,10 @@ def approve_request(
     request_row = db.get(DnsRequest, approval.request_id)
     approval.status = "APPROVED"
     db.add(ApprovalAction(approval_request_id=approval.id, approver_id=user.user_id, action="APPROVE"))
-    # No Executor exists yet (Phase 9) — approved requests sit at
-    # READY_TO_EXECUTE until that's built.
     request_row.status = "READY_TO_EXECUTE"
     db.commit()
     logger.info("approval=%s request=%s approved by user=%s", approval.id, request_row.id, user.user_id)
+    trigger_execution(db, request_row.id)
     return {"status": "APPROVED"}
 
 

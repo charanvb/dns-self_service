@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from shared.auth.fastapi_deps import CurrentUser, get_current_user
 from shared.database.session import get_session
+from shared.executor.engine import trigger_execution
 from shared.micetro.provider import MicetroProvider
 from shared.models.approvals import ApprovalRequest
 from shared.models.requests import DnsRequest, DnsRequestItem
@@ -214,13 +215,17 @@ def create_request(
         request_row.status = "PENDING_APPROVAL"
         db.add(ApprovalRequest(request_id=request_row.id, zone_id=zone.id, status="PENDING"))
     else:
-        request_row.status = "VALIDATED"
+        request_row.status = "READY_TO_EXECUTE"
 
     db.add_all(item_rows)
     db.commit()
     db.refresh(request_row)
     for row in item_rows:
         db.refresh(row)
+
+    if not policy_result.requires_approval:
+        trigger_execution(db, request_row.id)
+        db.refresh(request_row)
 
     return RequestOut(
         id=request_row.id,

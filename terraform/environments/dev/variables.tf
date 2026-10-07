@@ -50,3 +50,12 @@ variable "vpc_subnetwork" {
   type    = string
   default = "projects/ul-fs-n-plnetwork-prj/regions/europe-west4/subnetworks/gnl-ec-n-subnet-01"
 }
+
+# The ui service's own public URL, needed so the Azure Automation webhook
+# payload's callbackUrl points back at us. Chicken-and-egg: unknown before the
+# first deploy, so defaults empty — set via -var once the Cloud Run URL (or a
+# custom domain) is known, then re-apply.
+variable "app_callback_base_url" {
+  type    = string
+  default = ""
+}
