@@ -7,6 +7,7 @@ from shared.database.session import get_session
 from shared.micetro.provider import MicetroProvider
 from shared.models.requests import DnsRequest, DnsRequestItem
 from shared.models.zones import DnsZone
+from shared.policy.rate_limit import RateLimitExceeded, check_request_rate_limit
 from shared.validation.common import ValidationError, validate_fqdn, validate_ttl
 from shared.validation.registry import SUPPORTED_RECORD_TYPES, validate_record_value
 
@@ -30,6 +31,11 @@ def create_request(
     zone = db.get(DnsZone, body.zone_id)
     if zone is None or not zone.is_active:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Zone not found")
+
+    try:
+        check_request_rate_limit(db, user.user_id, user.roles)
+    except RateLimitExceeded as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc))
 
     request_row = DnsRequest(requestor_id=user.user_id, zone_id=zone.id, status="SUBMITTED",
                               justification=body.justification)

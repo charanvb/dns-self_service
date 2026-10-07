@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from ui.app.middleware import MaxBodySizeMiddleware
 from ui.app.routes.auth import router as auth_router
 from ui.app.routes.pages import router as pages_router
 from ui.app.routes.requests import router as requests_router
@@ -12,6 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(nam
 
 app = FastAPI(title="DNS Self-Service Automation Platform")
 
+app.add_middleware(MaxBodySizeMiddleware)
 app.mount("/static", StaticFiles(directory="ui/app/static"), name="static")
 app.include_router(auth_router)
 app.include_router(pages_router)

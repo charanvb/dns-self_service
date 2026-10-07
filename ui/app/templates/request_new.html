@@ -544,7 +544,10 @@ document.getElementById("submit-request").addEventListener("click", async () => 
       return;
     }
     const err = await res.json();
-    errEl.textContent = (err.detail && err.detail.message) ? err.detail.message : "Could not submit the request.";
+    let message = "Could not submit the request.";
+    if (typeof err.detail === "string") message = err.detail;
+    else if (err.detail && err.detail.message) message = err.detail.message;
+    errEl.textContent = message;
     errEl.style.display = "block";
   } catch (e) {
     errEl.textContent = "Could not reach the server.";

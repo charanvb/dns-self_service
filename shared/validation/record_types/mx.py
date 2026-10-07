@@ -1,11 +1,13 @@
 from shared.validation.common import ValidationError
-from shared.validation.record_types.cname import _HOSTNAME_RE
+from shared.validation.record_types.cname import _HOSTNAME_RE, _MAX_HOSTNAME_LEN
 
 
 def validate(value: dict) -> dict:
     target = str(value.get("target", "")).strip()
     if not target:
         raise ValidationError("target", "Mail server target is required")
+    if len(target) > _MAX_HOSTNAME_LEN:
+        raise ValidationError("target", f"Target exceeds {_MAX_HOSTNAME_LEN} characters")
     if not _HOSTNAME_RE.match(target):
         raise ValidationError("target", f"'{target}' is not a valid DNS name")
 
