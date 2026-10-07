@@ -417,11 +417,15 @@ function startRecordSearch(mode) {
 
 // Filters the already-loaded live Micetro records in-memory — no network
 // call here, since the full live list was fetched once when the zone was
-// selected (loadLiveRecords).
+// selected (loadLiveRecords). Only shows record types this app actually
+// supports (the backend rejects MODIFY/DELETE on anything else anyway, and
+// MODIFY's form-rendering would crash on an unknown type) — NS/SOA/other
+// infrastructure records must be managed directly in Micetro.
 function renderRecordResults(q) {
   const type = recordTypeFilter.value;
   const qLower = q.trim().toLowerCase();
   const items = (state.liveRecords || []).filter(r =>
+    RECORD_TYPES.includes(r.record_type) &&
     (!qLower || r.fqdn.toLowerCase().includes(qLower)) && (!type || r.record_type === type)
   ).slice(0, 50);
 

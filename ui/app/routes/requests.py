@@ -148,6 +148,27 @@ def create_request(
                 if item.action == "MODIFY":
                     new_value = validate_record_value(item.record_type, item.value)
 
+                    # Same SPF-duplicate rule as CREATE, applied here too —
+                    # otherwise editing an unrelated TXT record into a second
+                    # SPF record at a name that already has one would bypass
+                    # the CREATE-only check entirely. Excludes the record
+                    # being modified itself (that one's intentionally changing).
+                    if item.record_type == "TXT" and _is_spf_value(new_value.get("text", "")):
+                        records = live_zone_records()
+                        spf_exists = any(
+                            r.ref != source.ref
+                            and r.name.rstrip(".").lower() == fqdn_clean
+                            and r.record_type in ("TXT", "SPF")
+                            and _is_spf_value(r.data)
+                            for r in records
+                        )
+                        if spf_exists:
+                            raise ValidationError(
+                                "value",
+                                f"An SPF record already exists for '{fqdn_raw}'. Only one SPF record is "
+                                "allowed per name.",
+                            )
+
             item_rows.append(
                 DnsRequestItem(
                     request_id=request_row.id,

@@ -15,7 +15,11 @@ class RequestItemIn(BaseModel):
     # For MODIFY/DELETE: the Micetro record ref the user selected from the
     # live-fetched list — re-fetched live again at creation time, never
     # trusted from the browser, to guarantee no stale/discrepant data is used.
-    source_record_ref: str | None = Field(default=None, max_length=255)
+    # Strictly format-checked (matches Micetro's own ref shape, e.g.
+    # "dnsRecords/16953") since this value gets concatenated into a Micetro
+    # API URL path server-side — without this, a crafted value could attempt
+    # path traversal against the Micetro API under our shared service account.
+    source_record_ref: str | None = Field(default=None, max_length=255, pattern=r"^[A-Za-z]+/[0-9]+$")
 
     @field_validator("value")
     @classmethod

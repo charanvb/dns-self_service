@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from shared.models.requests import DnsRequest
@@ -35,9 +35,20 @@ def get_rate_limit(session: Session) -> int:
 def check_request_rate_limit(session: Session, user_id: int, roles: list[str]) -> None:
     """Raises RateLimitExceeded if this user has hit their rolling-24h request
     cap. Counts per REQUEST (not per record item) — a request with many items
-    still only counts once. ZONE_ADMIN/CLOUDOPS_ADMIN are exempt."""
+    still only counts once. ZONE_ADMIN/CLOUDOPS_ADMIN are exempt.
+
+    Serializes concurrent calls for the SAME user via a Postgres advisory
+    transaction lock — without this, two simultaneous submissions could both
+    pass the "under limit" check before either commits (TOCTOU), silently
+    exceeding the cap. The lock is released automatically when the caller's
+    transaction commits/rolls back, which only happens once the new
+    dns_requests row has actually been inserted — so the next concurrent
+    caller's count query is guaranteed to see it.
+    """
     if EXEMPT_ROLES.intersection(roles):
         return
+
+    session.execute(text("SELECT pg_advisory_xact_lock(:uid)"), {"uid": user_id})
 
     limit = get_rate_limit(session)
     window_start = datetime.now(timezone.utc) - timedelta(hours=24)
