@@ -31,6 +31,13 @@ def trigger_execution(db: Session, request_id: int) -> None:
         return
     zone = db.get(DnsZone, request.zone_id)
 
+    if os.environ.get("BACKUP_ENABLED", "false").lower() != "true":
+        # Azure Automation backup integration deliberately disabled for this
+        # setup (user decision) — go straight to execution. Flip BACKUP_ENABLED
+        # to "true" once that integration is picked back up.
+        _execute_items(db, request, zone)
+        return
+
     backup = db.execute(
         select(DnsZoneBackup)
         .where(DnsZoneBackup.request_id == request_id)
