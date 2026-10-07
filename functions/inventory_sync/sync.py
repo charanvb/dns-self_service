@@ -76,12 +76,12 @@ def time_now():
     return datetime.now(timezone.utc)
 
 
-def sync_zones(session, provider: MicetroProvider) -> list[tuple[int, str]]:
+def sync_zones(session, provider: MicetroProvider) -> list[tuple[int, str, str]]:
     sync_state = DnsSyncState(sync_type="ZONES", status="RUNNING")
     session.add(sync_state)
     session.commit()
 
-    synced: list[tuple[int, str]] = []
+    synced: list[tuple[int, str, str]] = []
     offset = 0
     total = None
     try:
@@ -91,7 +91,7 @@ def sync_zones(session, provider: MicetroProvider) -> list[tuple[int, str]]:
                 break
             for zone in zones:
                 zone_id = upsert_zone(session, zone)
-                synced.append((zone_id, zone.ref))
+                synced.append((zone_id, zone.ref, zone.name))
             session.commit()
             offset += len(zones)
             logger.info("zones synced: %d/%d", offset, total)
@@ -114,7 +114,7 @@ def sync_zones(session, provider: MicetroProvider) -> list[tuple[int, str]]:
     return synced
 
 
-def sync_records_for_zone(session, provider: MicetroProvider, zone_id: int, zone_ref: str) -> int:
+def sync_records_for_zone(session, provider: MicetroProvider, zone_id: int, zone_ref: str, zone_name: str) -> int:
     sync_state = DnsSyncState(sync_type="RECORDS", zone_id=zone_id, status="RUNNING")
     session.add(sync_state)
     session.commit()
@@ -124,7 +124,9 @@ def sync_records_for_zone(session, provider: MicetroProvider, zone_id: int, zone
     total = None
     try:
         while total is None or offset < total:
-            records, total = provider.search_records(zone_ref=zone_ref, offset=offset, limit=PAGE_SIZE)
+            records, total = provider.search_records(
+                zone_ref=zone_ref, offset=offset, limit=PAGE_SIZE, zone_name=zone_name
+            )
             if not records:
                 break
             for record in records:
@@ -161,8 +163,8 @@ def main() -> int:
 
         if SYNC_RECORDS:
             total_records = 0
-            for i, (zone_id, zone_ref) in enumerate(synced_zones, start=1):
-                n = sync_records_for_zone(session, provider, zone_id, zone_ref)
+            for i, (zone_id, zone_ref, zone_name) in enumerate(synced_zones, start=1):
+                n = sync_records_for_zone(session, provider, zone_id, zone_ref, zone_name)
                 total_records += n
                 logger.info("[%d/%d] zone_id=%s synced %d records", i, len(synced_zones), zone_id, n)
             logger.info("record sync complete: %d records across %d zones", total_records, len(synced_zones))

@@ -89,7 +89,7 @@ def live_zone_records(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Zone not found")
 
     provider = MicetroProvider()
-    records = provider.list_all_records(zone.micetro_ref)
+    records = provider.list_all_records(zone.micetro_ref, zone_name=zone.zone_name)
     return {
         "items": [
             {"ref": r.ref, "fqdn": r.name, "record_type": r.record_type, "ttl": r.ttl, "value": r.data}

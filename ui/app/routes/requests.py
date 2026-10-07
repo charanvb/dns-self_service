@@ -44,7 +44,7 @@ def create_request(
     def live_zone_records():
         nonlocal live_zone_records_cache
         if live_zone_records_cache is None:
-            live_zone_records_cache = provider.list_all_records(zone.micetro_ref)
+            live_zone_records_cache = provider.list_all_records(zone.micetro_ref, zone_name=zone.zone_name)
         return live_zone_records_cache
 
     item_rows: list[DnsRequestItem] = []
@@ -88,7 +88,7 @@ def create_request(
                 if not item.source_record_ref:
                     raise ValidationError("source_record_ref", "Select an existing record to modify/delete")
                 try:
-                    source = provider.get_record(item.source_record_ref)
+                    source = provider.get_record(item.source_record_ref, zone_name=zone.zone_name)
                 except Exception:
                     raise ValidationError(
                         "source_record_ref",
