@@ -235,6 +235,10 @@ function selectZone(zone) {
   document.getElementById("zone-selected").innerHTML =
     `<span class="selected-zone-chip">${zone.zone_name} <button id="zone-clear">&times;</button></span>`;
   document.getElementById("zone-clear").addEventListener("click", () => {
+    if (state.items.length > 0) {
+      toast("This request already has changes for " + state.zone.zone_name + ". Submit or remove them before picking a different zone.", "error");
+      return;
+    }
     state.zone = null;
     state.liveRecords = null;
     document.getElementById("zone-selected").innerHTML = "";
@@ -279,7 +283,14 @@ document.querySelectorAll(".action-choice").forEach(el => {
     document.getElementById("action-next").disabled = false;
   });
 });
-document.getElementById("action-back").addEventListener("click", () => showPanel("panel-zone"));
+document.getElementById("action-back").addEventListener("click", () => {
+  if (state.items.length > 0) {
+    // Zone is locked once a request has changes queued — one zone per request.
+    showPanel("panel-review");
+    return;
+  }
+  showPanel("panel-zone");
+});
 document.getElementById("action-next").addEventListener("click", () => {
   if (state.action === "CREATE") {
     renderTypeChips();

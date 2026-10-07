@@ -22,6 +22,10 @@ router = APIRouter(prefix="/api/requests", tags=["requests"])
 DEFAULT_TTL = 300
 
 
+def _is_spf_value(text: str) -> bool:
+    return text.strip().lower().startswith("v=spf1")
+
+
 @router.post("", response_model=RequestOut, status_code=status.HTTP_201_CREATED)
 def create_request(
     body: CreateRequestIn,
@@ -62,12 +66,21 @@ def create_request(
             validate_fqdn(item.fqdn, zone.zone_name)
             ttl = validate_ttl(item.ttl if item.ttl is not None else DEFAULT_TTL)
 
+            # Zone apex (@) holds critical NS/SOA/root records — never allow
+            # self-service changes there, regardless of action.
+            fqdn_clean = item.fqdn.rstrip(".").lower()
+            if fqdn_clean == zone.zone_name.rstrip(".").lower():
+                raise ValidationError(
+                    "fqdn",
+                    "Changes to the zone apex record are not allowed via self-service. "
+                    "Contact your DNS/CloudOps team directly for apex changes.",
+                )
+
             expected_current_value = None
             new_value = None
 
             if item.action == "CREATE":
                 new_value = validate_record_value(item.record_type, item.value)
-                fqdn_clean = item.fqdn.rstrip(".").lower()
                 records = live_zone_records()
                 logger.info(
                     "duplicate-check zone=%s fqdn_clean=%r type=%s live_record_count=%d sample=%r",
@@ -88,6 +101,23 @@ def create_request(
                         f"A {item.record_type} record already exists for '{item.fqdn}' in Micetro. "
                         "Use a Modify request instead of Create.",
                     )
+
+                # SPF-specific rule (independent of the exact type+name duplicate
+                # check above): only one SPF record is allowed per name, even if
+                # its exact text differs from the one being created.
+                if item.record_type == "TXT" and _is_spf_value(new_value.get("text", "")):
+                    spf_exists = any(
+                        r.name.rstrip(".").lower() == fqdn_clean
+                        and r.record_type in ("TXT", "SPF")
+                        and _is_spf_value(r.data)
+                        for r in records
+                    )
+                    if spf_exists:
+                        raise ValidationError(
+                            "value",
+                            f"An SPF record already exists for '{item.fqdn}'. Only one SPF record is "
+                            "allowed per name — use a Modify request to change it instead.",
+                        )
             else:
                 # MODIFY / DELETE must reference a live Micetro record, fetched
                 # fresh here (not the Postgres cache) to avoid any discrepancy.
