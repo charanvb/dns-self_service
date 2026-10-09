@@ -35,18 +35,37 @@ class MicetroClient:
     def _login(self) -> str:
         # Not listed under "paths" in the swagger export — confirmed via the live
         # Swagger UI "Try it out" that the real path has a "/micetro/" prefix.
-        resp = requests.post(
-            f"{self.base_url}/micetro/sessions",
-            json={"loginName": self.username, "password": self.password},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        body = resp.json()
-        # Confirmed response shape: {"result": {"session": "..."}}.
-        token = body.get("session") or body.get("result", {}).get("session")
-        if not token:
-            raise MicetroAuthError(f"Unexpected /micetro/sessions response shape: {body!r}")
-        return token
+        url = f"{self.base_url}/micetro/sessions"
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                resp = requests.post(
+                    url,
+                    json={"loginName": self.username, "password": self.password},
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                body = resp.json()
+                # Confirmed response shape: {"result": {"session": "..."}}.
+                token = body.get("session") or body.get("result", {}).get("session")
+                if not token:
+                    raise MicetroAuthError(f"Unexpected /micetro/sessions response shape: {body!r}")
+                return token
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                logger.warning(
+                    "Micetro login attempt %d/%d to %s timed out or connection failed: %s",
+                    attempt,
+                    max_attempts,
+                    url,
+                    exc,
+                )
+                if attempt == max_attempts:
+                    logger.error("All %d Micetro login attempts to %s failed", max_attempts, url)
+                    raise
+                time.sleep(2 * attempt)
+            except requests.exceptions.HTTPError as exc:
+                logger.error("Micetro login failed with HTTP error: %s", exc)
+                raise
 
     def _invalidate_cached_token(self) -> None:
         with _SESSION_LOCK:
@@ -73,17 +92,24 @@ class MicetroClient:
             return token
 
     def request(self, method: str, path: str, **kwargs) -> requests.Response:
+        url = f"{self.base_url}{path}"
         token = self._ensure_token()
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = f"Bearer {token}"
-        resp = requests.request(method, f"{self.base_url}{path}", headers=headers, timeout=30, **kwargs)
+        try:
+            resp = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+            logger.warning("Micetro request %s %s failed on first attempt: %s. Retrying once...", method, url, exc)
+            time.sleep(1)
+            resp = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+
         if resp.status_code == 401:
             # Session likely expired or revoked — invalidate cache, re-login once and retry.
             logger.info("Micetro returned 401 Unauthorized; invalidating session cache and retrying")
             self._invalidate_cached_token()
             token = self._ensure_token()
             headers["Authorization"] = f"Bearer {token}"
-            resp = requests.request(method, f"{self.base_url}{path}", headers=headers, timeout=30, **kwargs)
+            resp = requests.request(method, url, headers=headers, timeout=30, **kwargs)
         try:
             resp.raise_for_status()
         except requests.exceptions.HTTPError as exc:

@@ -49,6 +49,8 @@ def sync_zones(session, provider: MicetroProvider) -> int:
     session.add(sync_state)
     session.commit()
 
+    sync_state_id = sync_state.id
+
     synced_count = 0
     offset = 0
     total = None
@@ -72,11 +74,17 @@ def sync_zones(session, provider: MicetroProvider) -> int:
         sync_state.completed_at = time_now()
         session.commit()
     except Exception as exc:
+        logger.exception("Zone sync failed with exception: %s", exc)
         session.rollback()
-        sync_state.status = "FAILED"
-        sync_state.error_message = str(exc)[:2000]
-        sync_state.completed_at = time_now()
-        session.commit()
+        try:
+            failed_state = session.get(DnsSyncState, sync_state_id)
+            if failed_state:
+                failed_state.status = "FAILED"
+                failed_state.error_message = str(exc)[:2000]
+                failed_state.completed_at = time_now()
+                session.commit()
+        except Exception as inner_exc:
+            logger.error("Failed to record failure status in DnsSyncState: %s", inner_exc)
         raise
 
     return synced_count
