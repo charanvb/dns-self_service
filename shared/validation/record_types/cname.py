@@ -2,10 +2,10 @@ import re
 
 from shared.validation.common import ValidationError
 
-# Strict LDH (Letters-Digits-Hyphens, RFC 1035/1123) — no wildcards, no
-# underscores, no non-ASCII. Also hard-caps input length BEFORE regex
-# matching to avoid pathological-length inputs reaching the engine.
-_HOSTNAME_RE = re.compile(r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$")
+# Valid DNS hostname labels (Letters-Digits-Hyphens-Underscores) — allows underscores
+# for DKIM selectors, Azure domain verification (_asuid), and cloud targets.
+# Hard-caps input length BEFORE regex matching to avoid pathological-length inputs.
+_HOSTNAME_RE = re.compile(r"^(?!-)[A-Za-z0-9-_]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-_]{1,63}(?<!-))*\.?$")
 _MAX_HOSTNAME_LEN = 253
 
 

@@ -1,9 +1,17 @@
 import logging
 import os
+import threading
+import time
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+# Process-level session token cache to avoid creating a new Micetro session
+# on every API route invocation. Keyed by (base_url, username) -> (token, expiry_time).
+_SESSION_CACHE: dict[tuple[str, str], tuple[str, float]] = {}
+_SESSION_LOCK = threading.Lock()
+_SESSION_TTL_SECONDS = 900  # 15 minutes
 
 
 class MicetroAuthError(Exception):
@@ -12,13 +20,17 @@ class MicetroAuthError(Exception):
 
 class MicetroClient:
     """Thin HTTP client for the Micetro REST API v2. Handles session (bearer
-    token) auth only — no DNS business logic here, see MicetroProvider."""
+    token) auth with process-level token caching — no DNS business logic here,
+    see MicetroProvider."""
 
     def __init__(self, base_url: str | None = None, username: str | None = None, password: str | None = None):
         self.base_url = (base_url or os.environ["MICETRO_API_URL"]).rstrip("/")
         self.username = username or os.environ["MICETRO_API_USERNAME"]
         self.password = password or os.environ["MICETRO_API_PASSWORD"]
-        self._session_token: str | None = None
+
+    @property
+    def _cache_key(self) -> tuple[str, str]:
+        return (self.base_url, self.username)
 
     def _login(self) -> str:
         # Not listed under "paths" in the swagger export — confirmed via the live
@@ -36,10 +48,29 @@ class MicetroClient:
             raise MicetroAuthError(f"Unexpected /micetro/sessions response shape: {body!r}")
         return token
 
+    def _invalidate_cached_token(self) -> None:
+        with _SESSION_LOCK:
+            _SESSION_CACHE.pop(self._cache_key, None)
+
     def _ensure_token(self) -> str:
-        if self._session_token is None:
-            self._session_token = self._login()
-        return self._session_token
+        now = time.time()
+        cached = _SESSION_CACHE.get(self._cache_key)
+        if cached:
+            token, expiry = cached
+            if now < expiry:
+                return token
+
+        with _SESSION_LOCK:
+            # Double-check inside lock
+            cached = _SESSION_CACHE.get(self._cache_key)
+            if cached:
+                token, expiry = cached
+                if time.time() < expiry:
+                    return token
+
+            token = self._login()
+            _SESSION_CACHE[self._cache_key] = (token, time.time() + _SESSION_TTL_SECONDS)
+            return token
 
     def request(self, method: str, path: str, **kwargs) -> requests.Response:
         token = self._ensure_token()
@@ -47,8 +78,9 @@ class MicetroClient:
         headers["Authorization"] = f"Bearer {token}"
         resp = requests.request(method, f"{self.base_url}{path}", headers=headers, timeout=30, **kwargs)
         if resp.status_code == 401:
-            # Session likely expired — re-login once and retry.
-            self._session_token = None
+            # Session likely expired or revoked — invalidate cache, re-login once and retry.
+            logger.info("Micetro returned 401 Unauthorized; invalidating session cache and retrying")
+            self._invalidate_cached_token()
             token = self._ensure_token()
             headers["Authorization"] = f"Bearer {token}"
             resp = requests.request(method, f"{self.base_url}{path}", headers=headers, timeout=30, **kwargs)

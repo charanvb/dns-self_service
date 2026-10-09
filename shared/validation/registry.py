@@ -1,4 +1,4 @@
-from shared.validation.record_types import a, aaaa, cname, mx, txt
+from shared.validation.record_types import a, aaaa, cname, txt
 
 # Registry — add a new record type here (+ its module) without touching
 # request-creation logic or the UI's core rendering code.
@@ -7,7 +7,6 @@ RECORD_TYPE_VALIDATORS = {
     "AAAA": aaaa.validate,
     "CNAME": cname.validate,
     "TXT": txt.validate,
-    "MX": mx.validate,
 }
 
 SUPPORTED_RECORD_TYPES = tuple(RECORD_TYPE_VALIDATORS.keys())

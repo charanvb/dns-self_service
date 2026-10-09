@@ -1,14 +1,11 @@
 import logging
-import os
-import uuid
 
-import requests
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from shared.micetro.encoding import encode
 from shared.micetro.provider import MicetroProvider
-from shared.models.execution import AuditLog, DnsZoneBackup, ExecutionLog
+from shared.models.execution import AuditLog, ExecutionLog
 from shared.models.requests import DnsRequest, DnsRequestItem
 from shared.models.zones import DnsZone
 
@@ -22,97 +19,26 @@ class DriftConflictError(Exception):
 
 
 def trigger_execution(db: Session, request_id: int) -> None:
-    """Idempotent entry point — safe to call multiple times for the same
-    request (e.g. once on approval, again if a backup callback resumes it).
-    Only acts when the request is actually at READY_TO_EXECUTE/
-    BACKUP_IN_PROGRESS; any other status is a no-op."""
-    request = db.get(DnsRequest, request_id)
-    if request is None or request.status not in ("READY_TO_EXECUTE", "BACKUP_IN_PROGRESS"):
+    """Idempotent entry point — executes requests that are READY_TO_EXECUTE.
+    Uses row-level locking (with_for_update) to prevent concurrency race
+    conditions where multiple workers or duplicate approval triggers could
+    execute the same request concurrently.
+    """
+    request = db.execute(
+        select(DnsRequest).where(DnsRequest.id == request_id).with_for_update()
+    ).scalar_one_or_none()
+
+    if request is None or request.status != "READY_TO_EXECUTE":
         return
+
     zone = db.get(DnsZone, request.zone_id)
-
-    if os.environ.get("BACKUP_ENABLED", "false").lower() != "true":
-        # Azure Automation backup integration deliberately disabled for this
-        # setup (user decision) — go straight to execution. Flip BACKUP_ENABLED
-        # to "true" once that integration is picked back up.
-        _execute_items(db, request, zone)
-        return
-
-    backup = db.execute(
-        select(DnsZoneBackup)
-        .where(DnsZoneBackup.request_id == request_id)
-        .order_by(DnsZoneBackup.id.desc())
-    ).scalars().first()
-
-    if backup is None:
-        backup = _trigger_backup(db, request, zone)
-        request.status = "BACKUP_IN_PROGRESS" if backup.status == "TRIGGERED" else "BACKUP_FAILED"
-        if backup.status != "TRIGGERED":
-            request.failure_reason = backup.error_message
-        db.commit()
-        return
-
-    if backup.status == "TRIGGERED":
-        return  # still waiting on the Azure Automation callback
-
-    if backup.status in ("FAILED", "TIMEOUT"):
-        request.status = "BACKUP_FAILED"
-        request.failure_reason = backup.error_message or f"Zone backup {backup.status.lower()}"
+    if zone is None:
+        request.status = "FAILED"
+        request.failure_reason = f"Referenced zone {request.zone_id} not found"
         db.commit()
         return
 
     _execute_items(db, request, zone)
-
-
-def _trigger_backup(db: Session, request: DnsRequest, zone: DnsZone) -> DnsZoneBackup:
-    correlation_id = str(uuid.uuid4())
-    backup = DnsZoneBackup(request_id=request.id, zone_id=zone.id, correlation_id=correlation_id, status="TRIGGERED")
-    db.add(backup)
-    db.flush()
-
-    callback_base = os.environ.get("APP_CALLBACK_BASE_URL", "").rstrip("/")
-    try:
-        webhook_url = os.environ["AZURE_AUTOMATION_BACKUP_WEBHOOK_URL"]
-        resp = requests.post(
-            webhook_url,
-            json={
-                "zoneName": zone.zone_name,
-                "correlationId": correlation_id,
-                "callbackUrl": f"{callback_base}/internal/backups/{correlation_id}/complete",
-            },
-            timeout=30,
-        )
-        resp.raise_for_status()
-        body = resp.json() if resp.content else {}
-        backup.azure_job_id = str(body.get("jobId") or body.get("id") or "") or None
-    except Exception as exc:
-        logger.error("backup trigger failed for request=%s zone=%s: %s", request.id, zone.zone_name, exc)
-        backup.status = "FAILED"
-        backup.error_message = f"Failed to trigger zone backup: {exc}"
-    return backup
-
-
-def handle_backup_callback(
-    db: Session, correlation_id: str, succeeded: bool, backup_location: str | None, error: str | None
-) -> DnsZoneBackup:
-    backup = db.execute(
-        select(DnsZoneBackup).where(DnsZoneBackup.correlation_id == correlation_id)
-    ).scalar_one_or_none()
-    if backup is None:
-        raise ValueError(f"Unknown backup correlationId: {correlation_id}")
-    if backup.status != "TRIGGERED":
-        return backup  # already processed — ignore a duplicate/late callback
-
-    from shared.models.mixins import utcnow
-
-    backup.status = "COMPLETED" if succeeded else "FAILED"
-    backup.backup_location = backup_location
-    backup.error_message = error
-    backup.completed_at = utcnow()
-    db.commit()
-
-    trigger_execution(db, backup.request_id)
-    return backup
 
 
 def _execute_items(db: Session, request: DnsRequest, zone: DnsZone) -> None:
@@ -174,7 +100,9 @@ def _execute_create(provider: MicetroProvider, zone: DnsZone, item: DnsRequestIt
     # Re-check for a duplicate right before writing — closes the TOCTOU window
     # between request creation/approval and execution (could be hours/days).
     fqdn_clean = item.fqdn.rstrip(".").lower()
-    existing = provider.list_all_records(zone.micetro_ref, zone_name=zone.zone_name)
+    existing = provider.find_records_by_name(
+        zone.micetro_ref, fqdn=item.fqdn, record_type=item.record_type, zone_name=zone.zone_name
+    )
     duplicate = next(
         (r for r in existing if r.name.rstrip(".").lower() == fqdn_clean and r.record_type == item.record_type),
         None,

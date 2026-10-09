@@ -5,10 +5,6 @@ const FIELD_DEFS = {
   AAAA: [{ name: "ipv6", label: "IPv6 Address", placeholder: "2001:db8::1" }],
   CNAME: [{ name: "target", label: "Target (FQDN)", placeholder: "backend.example.com" }],
   TXT: [{ name: "text", label: "TXT Value", placeholder: "v=spf1 include:example.com -all", textarea: true }],
-  MX: [
-    { name: "priority", label: "Priority", placeholder: "10" },
-    { name: "target", label: "Mail Server (FQDN)", placeholder: "mail.example.com" },
-  ],
 };
 const RECORD_TYPES = Object.keys(FIELD_DEFS);
 

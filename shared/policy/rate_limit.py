@@ -55,7 +55,11 @@ def check_request_rate_limit(session: Session, user_id: int, roles: list[str]) -
     count = session.scalar(
         select(func.count())
         .select_from(DnsRequest)
-        .where(DnsRequest.requestor_id == user_id, DnsRequest.created_at >= window_start)
+        .where(
+            DnsRequest.requestor_id == user_id,
+            DnsRequest.created_at >= window_start,
+            DnsRequest.status.notin_(("REJECTED", "FAILED")),
+        )
     )
     if count >= limit:
         raise RateLimitExceeded(limit)

@@ -37,6 +37,16 @@ class DNSProvider(ABC):
         """Returns (records, total_count) for the given zone, unfiltered page."""
 
     @abstractmethod
+    def find_records_by_name(
+        self,
+        zone_ref: str,
+        fqdn: str,
+        record_type: str | None = None,
+        zone_name: str | None = None,
+    ) -> list[RecordDTO]:
+        """Targeted lookup for records matching an FQDN and optional record_type."""
+
+    @abstractmethod
     def get_record(self, record_ref: str) -> RecordDTO:
         """Fresh lookup by ref — used by the Executor for pre-execution conflict checks."""
 

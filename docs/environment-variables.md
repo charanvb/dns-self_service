@@ -10,22 +10,10 @@ Runtime config is injected via environment variables; secret values are mounted/
 | `db-connection-string` | PostgreSQL connection string (uses the Azure-internal IP, not a hostname — DNS resolution from GCP doesn't work for it) |
 | `micetro-api-username` | Micetro QA API user |
 | `micetro-api-password` | Micetro QA API password |
-| `logic-app-webhook-url` | Azure Logic App notification trigger URL |
-| `azure-automation-backup-webhook-url` | Azure Automation runbook webhook (URL itself contains an auth token — treat as fully secret) |
-| `azure-automation-backup-callback-secret` | HMAC key used to verify the runbook's completion callback |
 | `app-auth-signing-key` | Signing key for local/test auth session tokens (pre-CIH) |
 
-## Non-secret config
-
-| Variable | Purpose |
-|---|---|
-| `APP_CALLBACK_BASE_URL` | Public base URL of the ui service, used to build the Azure Automation backup callback URL (`{base}/internal/backups/{correlationId}/complete`). Set once the Cloud Run URL is known (`terraform/environments/dev/variables.tf` `app_callback_base_url`). |
-
-**Known open issue (Phase 9 Executor):** `/internal/backups/{correlationId}/complete` is authenticated via
-HMAC only (no session cookie), meant to be called by the Azure Automation runbook — but the ui service is
-currently behind IAP, which will reject the Azure-originated call before it reaches the app. This needs an
-infra decision (e.g. a separate, non-IAP-fronted ingress path for just this endpoint) before the backup
-callback can work end-to-end; not yet resolved.
+> [!NOTE]
+> Azure Logic App notification webhook (`logic-app-webhook-url`) and Azure Automation zone backup (`azure-automation-backup-webhook-url`, `azure-automation-backup-callback-secret`, `APP_CALLBACK_BASE_URL`) have been deferred and removed from active deployment pending architectural review.
 
 ## Local test users (Phase 3 — local auth only, replaced by CIH/SSO later)
 

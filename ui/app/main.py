@@ -6,7 +6,6 @@ from fastapi.staticfiles import StaticFiles
 from ui.app.middleware import MaxBodySizeMiddleware
 from ui.app.routes.approvals import router as approvals_router
 from ui.app.routes.auth import router as auth_router
-from ui.app.routes.internal import router as internal_router
 from ui.app.routes.pages import router as pages_router
 from ui.app.routes.requests import router as requests_router
 from ui.app.routes.zones import router as zones_router
@@ -22,7 +21,6 @@ app.include_router(pages_router)
 app.include_router(zones_router)
 app.include_router(requests_router)
 app.include_router(approvals_router)
-app.include_router(internal_router)
 
 
 @app.get("/healthz")

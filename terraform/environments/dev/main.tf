@@ -81,10 +81,7 @@ module "ui_service" {
     { name = "APP_AUTH_SIGNING_KEY", secret_id = "app-auth-signing-key" },
     { name = "MICETRO_API_USERNAME", secret_id = "micetro-api-username" },
     { name = "MICETRO_API_PASSWORD", secret_id = "micetro-api-password" },
-    # AZURE_AUTOMATION_BACKUP_WEBHOOK_URL / _CALLBACK_SECRET deliberately NOT wired yet — those
-    # secret containers have no version uploaded, which blocks Cloud Run from even starting a
-    # revision. Re-add once the backup integration (deferred) is picked back up. The Executor
-    # already fails safely (BACKUP_FAILED, no DNS write attempted) if these env vars are absent.
+    # Azure Automation backup and Logic App webhook secrets are deferred for later review.
   ]
 
   depends_on = [module.secret_manager]

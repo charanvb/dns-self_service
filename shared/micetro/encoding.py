@@ -22,6 +22,4 @@ def encode(record_type: str, value: dict) -> str:
         return value["target"]
     if record_type == "TXT":
         return value["text"]
-    if record_type == "MX":
-        return f'{value["priority"]}\t{value["target"]}'
     raise ValueError(f"No data encoder for record type: {record_type}")

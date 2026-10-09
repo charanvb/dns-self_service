@@ -1,5 +1,9 @@
+import logging
+
 from shared.dns_provider.base import DNSProvider, RecordDTO, ZoneDTO
 from shared.micetro.client import MicetroClient
+
+logger = logging.getLogger(__name__)
 
 # Micetro pseudo-"record types" that aren't actual DNS records (comments, zone
 # file directives) — never surfaced as DNSRecord rows in our inventory.
@@ -76,6 +80,72 @@ class MicetroProvider(DNSProvider):
             if r["type"] not in _NON_RECORD_TYPES
         ]
         return records, body["totalResults"]
+
+    def find_records_by_name(
+        self,
+        zone_ref: str,
+        fqdn: str,
+        record_type: str | None = None,
+        zone_name: str | None = None,
+    ) -> list[RecordDTO]:
+        """Queries Micetro directly for records matching an FQDN and optional
+        record_type using server-side filtering, preventing large full-zone downloads.
+        """
+        zone_name = zone_name or self._zone_name(zone_ref)
+        try:
+            relative_name = _to_relative_name(fqdn, zone_name)
+        except ValueError:
+            return []
+
+        if relative_name in ("@", ""):
+            filter_expr = 'name="" OR name="@"'
+        else:
+            filter_expr = f"name={relative_name}"
+
+        if record_type:
+            filter_expr = f"{filter_expr} AND type={record_type}"
+
+        try:
+            body = self.client.get(
+                f"/dnsZones/{zone_ref}/dnsRecords",
+                params={"filter": filter_expr, "limit": 100},
+            )
+            raw_records = body.get("dnsRecords") or body.get("result", {}).get("dnsRecords", []) if isinstance(body, dict) else []
+        except Exception as exc:
+            logger.warning(
+                "Targeted filter %r failed (%s); retrying with simple name filter",
+                filter_expr,
+                exc,
+            )
+            try:
+                body = self.client.get(
+                    f"/dnsZones/{zone_ref}/dnsRecords",
+                    params={"filter": f"name={relative_name}", "limit": 100},
+                )
+                raw_records = body.get("dnsRecords") or body.get("result", {}).get("dnsRecords", []) if isinstance(body, dict) else []
+            except Exception as exc2:
+                logger.warning("Simple filter fallback also failed (%s); returning empty", exc2)
+                raw_records = []
+
+        records = [
+            RecordDTO(
+                ref=r["ref"],
+                zone_ref=zone_ref,
+                name=_to_fqdn(r["name"], zone_name),
+                record_type=r["type"],
+                ttl=r.get("ttl", ""),
+                data=r.get("data", ""),
+            )
+            for r in raw_records
+            if r["type"] not in _NON_RECORD_TYPES
+        ]
+
+        fqdn_clean = fqdn.rstrip(".").lower()
+        return [
+            r for r in records
+            if r.name.rstrip(".").lower() == fqdn_clean
+            and (record_type is None or r.record_type == record_type)
+        ]
 
     def list_all_records(
         self, zone_ref: str, page_size: int = 500, safety_cap: int = 20000, zone_name: str | None = None

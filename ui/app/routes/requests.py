@@ -50,15 +50,17 @@ def create_request(
     db.flush()  # assign request_row.id without committing yet
 
     provider = MicetroProvider()
-    # Loaded lazily at most once per request-creation call (not per item) —
-    # needed for CREATE duplicate checks and as a fallback existence check.
-    live_zone_records_cache: list | None = None
+    # Cached per (fqdn, record_type) lookup to avoid redundant Micetro calls
+    # while validating items within the same request.
+    targeted_records_cache: dict[tuple[str, str | None], list] = {}
 
-    def live_zone_records():
-        nonlocal live_zone_records_cache
-        if live_zone_records_cache is None:
-            live_zone_records_cache = provider.list_all_records(zone.micetro_ref, zone_name=zone.zone_name)
-        return live_zone_records_cache
+    def get_records_for_name(fqdn_name: str, record_type: str | None = None):
+        cache_key = (fqdn_name, record_type)
+        if cache_key not in targeted_records_cache:
+            targeted_records_cache[cache_key] = provider.find_records_by_name(
+                zone.micetro_ref, fqdn=fqdn_name, record_type=record_type, zone_name=zone.zone_name
+            )
+        return targeted_records_cache[cache_key]
 
     item_rows: list[DnsRequestItem] = []
     # Tracks (fqdn, record_type) pairs already queued for CREATE earlier in
@@ -78,7 +80,7 @@ def create_request(
             if fqdn_raw.split(".")[0] == "@":
                 fqdn_raw = zone.zone_name
 
-            validate_fqdn(fqdn_raw, zone.zone_name)
+            validate_fqdn(fqdn_raw, zone.zone_name, record_type=item.record_type)
             ttl = validate_ttl(item.ttl if item.ttl is not None else DEFAULT_TTL)
 
             # Zone apex holds critical NS/SOA/root records — block self-service
@@ -107,7 +109,7 @@ def create_request(
                         f"'{fqdn_raw}'. Combine them into one change.",
                     )
 
-                records = live_zone_records()
+                records = get_records_for_name(fqdn_clean, item.record_type)
                 logger.info(
                     "duplicate-check zone=%s fqdn_clean=%r type=%s live_record_count=%d sample=%r",
                     zone.zone_name, fqdn_clean, item.record_type, len(records),
@@ -133,11 +135,12 @@ def create_request(
                 # check above): only one SPF record is allowed per name, even if
                 # its exact text differs from the one being created.
                 if item.record_type == "TXT" and _is_spf_value(new_value.get("text", "")):
+                    txt_records = get_records_for_name(fqdn_clean, "TXT")
                     spf_exists = any(
                         r.name.rstrip(".").lower() == fqdn_clean
                         and r.record_type in ("TXT", "SPF")
                         and _is_spf_value(r.data)
-                        for r in records
+                        for r in txt_records
                     )
                     if spf_exists:
                         raise ValidationError(
@@ -172,13 +175,13 @@ def create_request(
                     # the CREATE-only check entirely. Excludes the record
                     # being modified itself (that one's intentionally changing).
                     if item.record_type == "TXT" and _is_spf_value(new_value.get("text", "")):
-                        records = live_zone_records()
+                        txt_records = get_records_for_name(fqdn_clean, "TXT")
                         spf_exists = any(
                             r.ref != source.ref
                             and r.name.rstrip(".").lower() == fqdn_clean
                             and r.record_type in ("TXT", "SPF")
                             and _is_spf_value(r.data)
-                            for r in records
+                            for r in txt_records
                         )
                         if spf_exists:
                             raise ValidationError(
