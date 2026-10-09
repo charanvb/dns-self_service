@@ -129,6 +129,21 @@
     </div>
   </div>
 
+  <!-- Step 3c-txt: MODIFY — manage all TXT values at this name -->
+  <div class="panel" id="panel-modify-txt" style="display:none;">
+    <h2>Manage TXT values</h2>
+    <div class="fqdn-preview" id="modify-txt-fqdn"></div>
+    <p class="hint">TXT records can have multiple independent values at the same name — edit or remove
+      existing values below, or add new ones.</p>
+    <div id="txt-entries"></div>
+    <button class="btn btn-secondary" type="button" id="txt-add-value">+ Add another value</button>
+    <div class="form-error" id="modify-txt-error"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="modify-txt-back">&larr; Back</button>
+      <button class="btn btn-primary" id="modify-txt-save">Apply changes</button>
+    </div>
+  </div>
+
   <!-- Step 3d: DELETE — confirm -->
   <div class="panel" id="panel-delete-confirm" style="display:none;">
     <h2>Confirm deletion</h2>
@@ -170,10 +185,11 @@
 const state = { zone: null, action: null, items: [], recordSearchMode: null, selectedRecord: null, selectedCreateType: "A", liveRecords: null, liveRecordsLoading: false };
 
 function showPanel(id) {
-  ["panel-zone","panel-action","panel-create","panel-record-search","panel-modify-edit","panel-delete-confirm","panel-review"]
+  ["panel-zone","panel-action","panel-create","panel-record-search","panel-modify-edit","panel-modify-txt","panel-delete-confirm","panel-review"]
     .forEach(p => document.getElementById(p).style.display = (p === id ? "block" : "none"));
   const stepMap = { "panel-zone":"zone", "panel-action":"action", "panel-create":"details",
-    "panel-record-search":"details", "panel-modify-edit":"details", "panel-delete-confirm":"details", "panel-review":"review" };
+    "panel-record-search":"details", "panel-modify-edit":"details", "panel-modify-txt":"details",
+    "panel-delete-confirm":"details", "panel-review":"review" };
   document.querySelectorAll(".step").forEach(s => {
     s.classList.toggle("active", s.dataset.step === stepMap[id]);
   });
@@ -190,6 +206,12 @@ function toast(message, type) {
 function debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function escapeHtml(str) {
+  return String(str == null ? "" : str).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
 }
 
 // ---- Step 1: zone search ----
@@ -313,15 +335,16 @@ function renderTypeChips() {
   renderDynamicFields("dynamic-fields", state.selectedCreateType);
 }
 
-function renderDynamicFields(containerId, recordType) {
+function renderDynamicFields(containerId, recordType, prefill) {
   const el = document.getElementById(containerId);
   el.innerHTML = "";
   FIELD_DEFS[recordType].forEach(f => {
     const wrap = document.createElement("div");
     if (f.textarea) wrap.className = "full";
+    const val = prefill && prefill[f.name] !== undefined ? prefill[f.name] : "";
     wrap.innerHTML = `<label>${f.label}</label>` +
-      (f.textarea ? `<textarea data-field="${f.name}" rows="3" placeholder="${f.placeholder}"></textarea>`
-                  : `<input data-field="${f.name}" type="text" placeholder="${f.placeholder}" />`);
+      (f.textarea ? `<textarea data-field="${f.name}" rows="3" placeholder="${f.placeholder}">${escapeHtml(val)}</textarea>`
+                  : `<input data-field="${f.name}" type="text" placeholder="${f.placeholder}" value="${escapeHtml(val)}" />`);
     el.appendChild(wrap);
   });
 }
@@ -470,13 +493,152 @@ document.getElementById("record-search-back").addEventListener("click", () => sh
 
 // ---- Step 3c: MODIFY edit ----
 function startModifyEdit(record) {
+  // TXT is the one type that can have several independent values at the
+  // same name — manage all of them together instead of a single-record form.
+  if (record.record_type === "TXT") {
+    startTxtMultiEdit(record);
+    return;
+  }
   document.getElementById("modify-fqdn").innerHTML =
     `<span class="record-type-badge" data-type="${record.record_type}">${record.record_type}</span> ${record.fqdn}`;
   document.getElementById("modify-ttl").value = record.ttl;
-  renderDynamicFields("modify-dynamic-fields", record.record_type);
+  const fieldDef = (FIELD_DEFS[record.record_type] || [])[0];
+  renderDynamicFields("modify-dynamic-fields", record.record_type, fieldDef ? { [fieldDef.name]: record.value } : {});
   showPanel("panel-modify-edit");
 }
 document.getElementById("modify-back").addEventListener("click", () => showPanel("panel-record-search"));
+
+// ---- Step 3c-txt: MODIFY — manage all TXT values at this name ----
+function startTxtMultiEdit(record) {
+  const fqdnClean = record.fqdn.replace(/\.$/, "").toLowerCase();
+  const matches = (state.liveRecords || []).filter(r =>
+    r.record_type === "TXT" && r.fqdn.replace(/\.$/, "").toLowerCase() === fqdnClean);
+  state.txtFqdn = record.fqdn;
+  state.txtEntries = matches.map(r => ({
+    ref: r.ref, originalText: r.value, originalTtl: r.ttl,
+    text: r.value, ttl: r.ttl, removed: false, isNew: false,
+  }));
+  document.getElementById("modify-txt-fqdn").innerHTML =
+    `<span class="record-type-badge" data-type="TXT">TXT</span> ${record.fqdn}`;
+  document.getElementById("modify-txt-error").style.display = "none";
+  renderTxtEntries();
+  showPanel("panel-modify-txt");
+}
+
+function renderTxtEntries() {
+  const el = document.getElementById("txt-entries");
+  el.innerHTML = "";
+  state.txtEntries.forEach((entry, idx) => {
+    const row = document.createElement("div");
+    row.className = "txt-entry" + (entry.removed ? " removed" : "");
+
+    if (entry.removed) {
+      row.innerHTML = `<div class="meta">Marked for removal: <span class="value">${escapeHtml(entry.originalText)}</span></div>`;
+      const undoBtn = document.createElement("button");
+      undoBtn.className = "btn btn-secondary";
+      undoBtn.type = "button";
+      undoBtn.textContent = "Undo";
+      undoBtn.addEventListener("click", () => { entry.removed = false; renderTxtEntries(); });
+      row.appendChild(undoBtn);
+      el.appendChild(row);
+      return;
+    }
+
+    row.innerHTML = `
+      <div class="field-grid">
+        <div class="txt-ttl-col">
+          <label>TTL (seconds)</label>
+          <input type="number" class="txt-ttl-input" value="${entry.ttl}" />
+        </div>
+        <div class="full">
+          <label>${entry.isNew ? "New TXT value" : "TXT Value"}</label>
+          <textarea class="txt-text-input" rows="2" placeholder="v=spf1 include:example.com -all">${escapeHtml(entry.text)}</textarea>
+        </div>
+      </div>`;
+    row.querySelector(".txt-ttl-input").addEventListener("input", (e) => {
+      entry.ttl = parseInt(e.target.value, 10) || entry.ttl;
+    });
+    row.querySelector(".txt-text-input").addEventListener("input", (e) => { entry.text = e.target.value; });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "remove-btn";
+    removeBtn.type = "button";
+    removeBtn.textContent = entry.isNew ? "Discard" : "Remove";
+    removeBtn.addEventListener("click", () => {
+      if (entry.isNew) { state.txtEntries.splice(idx, 1); } else { entry.removed = true; }
+      renderTxtEntries();
+    });
+    row.appendChild(removeBtn);
+    el.appendChild(row);
+  });
+}
+
+document.getElementById("txt-add-value").addEventListener("click", () => {
+  state.txtEntries.push({ ref: null, originalText: "", originalTtl: 300, text: "", ttl: 300, removed: false, isNew: true });
+  renderTxtEntries();
+});
+
+document.getElementById("modify-txt-back").addEventListener("click", () => showPanel("panel-record-search"));
+
+document.getElementById("modify-txt-save").addEventListener("click", () => {
+  const errEl = document.getElementById("modify-txt-error");
+  errEl.style.display = "none";
+  const fqdn = state.txtFqdn;
+  const newItems = [];
+
+  for (const entry of state.txtEntries) {
+    if (entry.removed) {
+      if (entry.ref) {
+        newItems.push({
+          action: "DELETE", record_type: "TXT", fqdn, ttl: entry.originalTtl, value: {},
+          source_record_ref: entry.ref,
+          _display: { previousValue: entry.originalText },
+        });
+      }
+      continue;
+    }
+    if (entry.isNew) {
+      const text = (entry.text || "").trim();
+      if (!text) continue;
+      if (!entry.ttl || entry.ttl < 60 || entry.ttl > 86400) {
+        errEl.textContent = "TTL must be between 60 and 86400 for new TXT values";
+        errEl.style.display = "block";
+        return;
+      }
+      newItems.push({ action: "CREATE", record_type: "TXT", fqdn, ttl: entry.ttl, value: { text } });
+      continue;
+    }
+    const textChanged = entry.text !== entry.originalText;
+    const ttlChanged = entry.ttl !== entry.originalTtl;
+    if (!textChanged && !ttlChanged) continue;
+    if (!(entry.text || "").trim()) {
+      errEl.textContent = "TXT value cannot be blank — remove it instead of clearing the text.";
+      errEl.style.display = "block";
+      return;
+    }
+    if (!entry.ttl || entry.ttl < 60 || entry.ttl > 86400) {
+      errEl.textContent = "TTL must be between 60 and 86400";
+      errEl.style.display = "block";
+      return;
+    }
+    newItems.push({
+      action: "MODIFY", record_type: "TXT", fqdn, ttl: entry.ttl, value: { text: entry.text },
+      source_record_ref: entry.ref,
+      _display: { previousValue: entry.originalText },
+    });
+  }
+
+  if (newItems.length === 0) {
+    errEl.textContent = "No changes to apply — edit, remove, or add a value first.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  state.items.push(...newItems);
+  toast("Added to request", "success");
+  renderReview();
+  showPanel("panel-review");
+});
 document.getElementById("modify-add").addEventListener("click", () => {
   const record = state.selectedRecord;
   const ttl = parseInt(document.getElementById("modify-ttl").value, 10);

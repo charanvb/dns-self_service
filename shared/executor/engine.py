@@ -99,12 +99,21 @@ def _execute_create(provider: MicetroProvider, zone: DnsZone, item: DnsRequestIt
 
     # Re-check for a duplicate right before writing — closes the TOCTOU window
     # between request creation/approval and execution (could be hours/days).
+    # TXT allows several independent values per name, so only an exact-text
+    # match counts as a conflicting duplicate there; every other type still
+    # treats any existing record of the same type+name as a conflict.
     fqdn_clean = item.fqdn.rstrip(".").lower()
+    allows_multiple_values = item.record_type == "TXT"
+    data = encode(item.record_type, item.new_value or {})
     existing = provider.find_records_by_name(
         zone.micetro_ref, fqdn=item.fqdn, record_type=item.record_type, zone_name=zone.zone_name
     )
     duplicate = next(
-        (r for r in existing if r.name.rstrip(".").lower() == fqdn_clean and r.record_type == item.record_type),
+        (
+            r for r in existing
+            if r.name.rstrip(".").lower() == fqdn_clean and r.record_type == item.record_type
+            and (not allows_multiple_values or r.data == data)
+        ),
         None,
     )
     if duplicate is not None:
@@ -114,7 +123,6 @@ def _execute_create(provider: MicetroProvider, zone: DnsZone, item: DnsRequestIt
         )
 
     ttl = item.ttl or 300
-    data = encode(item.record_type, item.new_value or {})
     record = RecordDTO(ref="", zone_ref=zone.micetro_ref, name=item.fqdn, record_type=item.record_type, ttl=str(ttl), data=data)
     provider.create_record(zone.micetro_ref, record)
 

@@ -455,6 +455,37 @@ h1.welcome {
 }
 .fqdn-preview .zone-part { color: var(--text-muted); }
 
+.txt-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+}
+.txt-entry .field-grid { flex: 1; margin-bottom: 0; }
+.txt-entry .txt-ttl-col { grid-column: span 1; max-width: 140px; }
+.txt-entry .remove-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-top: 24px;
+}
+.txt-entry.removed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fdecea;
+  border-color: var(--danger);
+}
+.txt-entry.removed .meta { color: var(--danger); }
+.txt-entry.removed .value { font-family: var(--mono); text-decoration: line-through; }
+
 .field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

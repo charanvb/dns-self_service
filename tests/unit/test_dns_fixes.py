@@ -168,5 +168,67 @@ class TestMicetroNameConversions(unittest.TestCase):
         self.assertEqual(_to_relative_name("web1.com.", "web1.com."), "")
 
 
+class TestTxtMultiValueCreateConflict(unittest.TestCase):
+    """TXT is the one record type allowed to have several independent values
+    at the same name — the create-time conflict check must only treat an
+    exact-text match as a duplicate, not any existing TXT record at that name."""
+
+    def _make_item(self, record_type, fqdn, text, ttl=300):
+        item = MagicMock()
+        item.record_type = record_type
+        item.fqdn = fqdn
+        item.ttl = ttl
+        item.new_value = {"text": text}
+        return item
+
+    def test_txt_new_distinct_value_is_not_a_conflict(self):
+        from shared.dns_provider.base import RecordDTO
+        from shared.executor.engine import _execute_create
+
+        zone = MagicMock(micetro_ref="dnsZones/1", zone_name="example.com")
+        provider = MagicMock()
+        provider.find_records_by_name.return_value = [
+            RecordDTO(ref="dnsRecords/1", zone_ref="dnsZones/1", name="example.com",
+                      record_type="TXT", ttl="3600", data="v=spf1 -all"),
+        ]
+        item = self._make_item("TXT", "example.com", "google-site-verification=abc123")
+
+        _execute_create(provider, zone, item)
+        provider.create_record.assert_called_once()
+
+    def test_txt_exact_duplicate_text_is_a_conflict(self):
+        from shared.dns_provider.base import RecordDTO
+        from shared.executor.engine import _execute_create, DriftConflictError
+
+        zone = MagicMock(micetro_ref="dnsZones/1", zone_name="example.com")
+        provider = MagicMock()
+        provider.find_records_by_name.return_value = [
+            RecordDTO(ref="dnsRecords/1", zone_ref="dnsZones/1", name="example.com",
+                      record_type="TXT", ttl="3600", data="v=spf1 -all"),
+        ]
+        item = self._make_item("TXT", "example.com", "v=spf1 -all")
+
+        with self.assertRaises(DriftConflictError):
+            _execute_create(provider, zone, item)
+        provider.create_record.assert_not_called()
+
+    def test_a_record_any_existing_is_still_a_conflict(self):
+        from shared.dns_provider.base import RecordDTO
+        from shared.executor.engine import _execute_create, DriftConflictError
+
+        zone = MagicMock(micetro_ref="dnsZones/1", zone_name="example.com")
+        provider = MagicMock()
+        provider.find_records_by_name.return_value = [
+            RecordDTO(ref="dnsRecords/2", zone_ref="dnsZones/1", name="server.example.com",
+                      record_type="A", ttl="3600", data="10.0.0.1"),
+        ]
+        item = self._make_item("A", "server.example.com", None)
+        item.new_value = {"ipv4": "10.0.0.2"}
+
+        with self.assertRaises(DriftConflictError):
+            _execute_create(provider, zone, item)
+        provider.create_record.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

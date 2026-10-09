@@ -100,8 +100,15 @@ def create_request(
 
             if item.action == "CREATE":
                 new_value = validate_record_value(item.record_type, item.value)
+                # TXT is the one record type that legitimately needs several
+                # independent values at the same name (SPF, domain-verification
+                # TXTs, etc.) — dedupe by exact text instead of blocking on type.
+                allows_multiple_values = item.record_type == "TXT"
 
-                create_key = (fqdn_clean, item.record_type)
+                if allows_multiple_values:
+                    create_key = (fqdn_clean, item.record_type, new_value.get("text", ""))
+                else:
+                    create_key = (fqdn_clean, item.record_type)
                 if create_key in create_keys_seen:
                     raise ValidationError(
                         "fqdn",
@@ -119,6 +126,7 @@ def create_request(
                     (
                         r for r in records
                         if r.name.rstrip(".").lower() == fqdn_clean and r.record_type == item.record_type
+                        and (not allows_multiple_values or r.data == new_value.get("text", ""))
                     ),
                     None,
                 )
@@ -126,8 +134,9 @@ def create_request(
                 if duplicate is not None:
                     raise ValidationError(
                         "fqdn",
-                        f"A {item.record_type} record already exists for '{fqdn_raw}' in Micetro. "
-                        "Use a Modify request instead of Create.",
+                        f"A {item.record_type} record already exists for '{fqdn_raw}'"
+                        + (" with this exact value" if allows_multiple_values else "")
+                        + " in Micetro. Use a Modify request instead of Create.",
                     )
                 create_keys_seen.add(create_key)
 
