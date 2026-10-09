@@ -98,6 +98,32 @@ class TestMicetroSessionCaching(unittest.TestCase):
         self.assertNotIn(client._cache_key, _SESSION_CACHE)
 
 
+class TestMicetroBaseUrlNormalization(unittest.TestCase):
+    def test_host_only_url_gets_default_api_path(self):
+        client = MicetroClient(
+            base_url="https://ssportal-qa.unilever.com",
+            username="testuser",
+            password="testpassword",
+        )
+        self.assertEqual(client.base_url, "https://ssportal-qa.unilever.com/mmws/api/v2")
+
+    def test_mmws_api_url_gets_version_suffix(self):
+        client = MicetroClient(
+            base_url="https://ssportal-qa.unilever.com/mmws/api",
+            username="testuser",
+            password="testpassword",
+        )
+        self.assertEqual(client.base_url, "https://ssportal-qa.unilever.com/mmws/api/v2")
+
+    def test_v2_url_is_preserved(self):
+        client = MicetroClient(
+            base_url="https://ssportal-qa.unilever.com/mmws/api/v2",
+            username="testuser",
+            password="testpassword",
+        )
+        self.assertEqual(client.base_url, "https://ssportal-qa.unilever.com/mmws/api/v2")
+
+
 class TestTargetedRecordLookup(unittest.TestCase):
     @patch.object(MicetroClient, "get")
     def test_find_records_by_name_apex(self, mock_get):

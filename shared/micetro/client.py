@@ -2,6 +2,7 @@ import logging
 import os
 import threading
 import time
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
@@ -24,9 +25,44 @@ class MicetroClient:
     see MicetroProvider."""
 
     def __init__(self, base_url: str | None = None, username: str | None = None, password: str | None = None):
-        self.base_url = (base_url or os.environ["MICETRO_API_URL"]).rstrip("/")
+        self.base_url = self._normalize_base_url(base_url or os.environ["MICETRO_API_URL"])
         self.username = username or os.environ["MICETRO_API_USERNAME"]
         self.password = password or os.environ["MICETRO_API_PASSWORD"]
+
+    @staticmethod
+    def _normalize_base_url(raw_url: str) -> str:
+        """Micetro REST endpoints live under /mmws/api/v2.
+
+        Some environments were configured with only the host URL; normalize
+        that to avoid calling a non-existent /micetro/sessions path.
+        """
+        raw = (raw_url or "").strip().rstrip("/")
+        if not raw:
+            raise ValueError("MICETRO_API_URL is empty")
+
+        parsed = urlsplit(raw)
+        path = parsed.path.rstrip("/")
+        expected_prefix = "/mmws/api/v2"
+
+        if path in ("", "/"):
+            normalized = urlunsplit((parsed.scheme, parsed.netloc, expected_prefix, parsed.query, parsed.fragment))
+            logger.warning(
+                "MICETRO_API_URL '%s' has no API path; normalizing to '%s'",
+                raw_url,
+                normalized,
+            )
+            return normalized
+
+        if path.lower() == "/mmws/api":
+            normalized = urlunsplit((parsed.scheme, parsed.netloc, expected_prefix, parsed.query, parsed.fragment))
+            logger.warning(
+                "MICETRO_API_URL '%s' is missing version suffix; normalizing to '%s'",
+                raw_url,
+                normalized,
+            )
+            return normalized
+
+        return raw
 
     @property
     def _cache_key(self) -> tuple[str, str]:
