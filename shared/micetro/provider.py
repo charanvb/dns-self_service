@@ -26,14 +26,12 @@ def _to_fqdn(record_name: str, zone_name: str) -> str:
 
 def _to_relative_name(fqdn: str, zone_name: str) -> str:
     """Inverse of _to_fqdn, needed to build the "name" field Micetro expects
-    on writes. Apex representation as "@" follows common DDI-tool convention
-    but is NOT empirically confirmed against a live Micetro write — verify
-    before relying on this for an apex CREATE (currently only TXT records are
-    allowed at the apex per validation rules)."""
+    on writes. For apex writes use an empty relative name; using "@" caused
+    Micetro to reject TXT creates with syntax errors in QA."""
     zone_clean = zone_name.rstrip(".")
     fqdn_clean = fqdn.rstrip(".")
     if fqdn_clean.lower() == zone_clean.lower():
-        return "@"
+        return ""
     suffix = "." + zone_clean
     if fqdn_clean.lower().endswith(suffix.lower()):
         return fqdn_clean[: -len(suffix)]

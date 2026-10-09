@@ -7,7 +7,7 @@ from shared.validation.record_types.cname import validate as validate_cname
 from shared.validation.registry import SUPPORTED_RECORD_TYPES, RECORD_TYPE_VALIDATORS
 from shared.micetro.encoding import encode
 from shared.micetro.client import MicetroClient, _SESSION_CACHE, _SESSION_LOCK
-from shared.micetro.provider import MicetroProvider
+from shared.micetro.provider import MicetroProvider, _to_relative_name
 
 
 class TestFqdnValidation(unittest.TestCase):
@@ -160,6 +160,12 @@ class TestTargetedRecordLookup(unittest.TestCase):
         args, kwargs = mock_get.call_args
         self.assertIn("filter", kwargs["params"])
         self.assertIn("type=TXT", kwargs["params"]["filter"])
+
+
+class TestMicetroNameConversions(unittest.TestCase):
+    def test_apex_relative_name_is_empty_for_writes(self):
+        self.assertEqual(_to_relative_name("web1.com", "web1.com"), "")
+        self.assertEqual(_to_relative_name("web1.com.", "web1.com."), "")
 
 
 if __name__ == "__main__":
